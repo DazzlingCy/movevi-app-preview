@@ -1,0 +1,19 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Local archive and design QA artifacts
+/app/
+/design-qa.md
+/design-qa-home-390x844.png
+/home-layout-updated-390x844.png
+/premium-home-before.png
+/premium-home-after.png
+/fix.cjs
+/src/check_images.ts
+/.github/workflows/deploy.yml

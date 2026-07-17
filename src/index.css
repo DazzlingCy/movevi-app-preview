@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --app-bg: #080a0c;
+  --surface: rgba(18, 21, 24, 0.78);
+  --surface-strong: rgba(12, 15, 18, 0.92);
+  --surface-soft: rgba(255, 255, 255, 0.055);
+  --hairline: rgba(255, 255, 255, 0.1);
+  --ink: #f5f7f8;
+  --muted: rgba(235, 241, 244, 0.5);
+  --accent: #64d2ff;
+  --danger: #ff375f;
+  --success: #30d158;
+  --warning: #ffd60a;
+  --radius-card: 28px;
+  --radius-control: 20px;
+  --shadow-material: 0 18px 46px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  --motion-fast: 180ms;
+  --motion-standard: 240ms;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background: var(--app-bg);
+}
+
+body {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.premium-material,
+.premium-material-strong,
+.premium-control {
+  border: 1px solid var(--hairline);
+  -webkit-backdrop-filter: saturate(130%) blur(24px);
+  backdrop-filter: saturate(130%) blur(24px);
+}
+
+.premium-material {
+  background: var(--surface);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.premium-material-strong {
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-material);
+}
+
+.premium-control {
+  background: rgba(16, 19, 22, 0.82);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.premium-map-wash {
+  background:
+    radial-gradient(circle at 52% 44%, rgba(100, 210, 255, 0.09), transparent 34%),
+    linear-gradient(180deg, rgba(16, 43, 52, 0.92) 0%, rgba(9, 20, 25, 0.96) 58%, rgba(6, 9, 11, 1) 100%);
+}
+
+.premium-vignette {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.04) 0%, transparent 22%, transparent 58%, rgba(0, 0, 0, 0.34) 100%);
+}
+
+@layer utilities {
+  .hide-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
