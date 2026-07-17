@@ -142,11 +142,6 @@ export default function App() {
             setEventsFocus('hundred');
             setActiveTab('events');
           }}
-          onViewAllEvents={() => {
-            setShowEventsBadge(false);
-            setEventsFocus(null);
-            setActiveTab('events');
-          }}
           activityDrawCounts={{
             medalLottery: userStats.medalMysteryTickets || 0,
             weekendMedley: medleyLotteryChances,
@@ -478,7 +473,7 @@ export default function App() {
                 whileTap={{ scale: 0.96 }}
                 transition={{ duration: 0.18, ease: 'easeOut' }}
                 className={`relative flex min-h-12 min-w-[60px] flex-col items-center justify-center gap-1 rounded-[18px] px-2 transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
-                  isActive ? 'bg-white/[0.06] text-[var(--accent)]' : 'text-white/30 hover:bg-white/[0.035] hover:text-white/60'
+                  isActive ? 'bg-white/[0.07] text-[var(--accent)]' : 'text-white/50 hover:bg-white/[0.045] hover:text-white/76'
                 }`}
               >
                 <div className="relative flex h-6 w-6 items-center justify-center">

@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { ChevronRight, Flame, Gift, Globe2, Sparkles } from 'lucide-react';
+import { Flame, Gift, Globe2, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface ActivityQuickLaunchProps {
@@ -7,7 +7,6 @@ interface ActivityQuickLaunchProps {
   onSelectMedley?: () => void;
   onSelectWeightLossPlan?: () => void;
   onSelectHundredCities?: () => void;
-  onViewAll?: () => void;
   drawCounts?: ActivityDrawCounts;
 }
 
@@ -34,7 +33,6 @@ export default function ActivityQuickLaunch({
   onSelectMedley,
   onSelectWeightLossPlan,
   onSelectHundredCities,
-  onViewAll,
   drawCounts = {}
 }: ActivityQuickLaunchProps) {
   const activities: ActivityEntry[] = [
@@ -82,26 +80,9 @@ export default function ActivityQuickLaunch({
 
   return (
     <section
-      aria-labelledby="home-activities-title"
+      aria-label="活动快捷入口"
       className="premium-material-strong rounded-[30px] p-3.5"
     >
-      <div className="mb-3 flex items-center justify-between px-0.5">
-        <div className="flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-          <h2 id="home-activities-title" className="text-[13px] font-semibold tracking-[-0.01em] text-white">
-            热门活动
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={onViewAll}
-          className="flex min-h-11 items-center gap-0.5 rounded-full px-2.5 text-[10px] font-medium text-white/45 transition-colors duration-200 hover:bg-white/[0.06] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-        >
-          全部
-          <ChevronRight size={13} />
-        </button>
-      </div>
-
       <div className="grid grid-cols-4 gap-2">
         {activities.map((activity, index) => {
           const Icon = activity.icon;
@@ -129,10 +110,10 @@ export default function ActivityQuickLaunch({
               <span className={`mx-auto flex h-10 w-10 items-center justify-center rounded-[15px] border ${activity.iconSurfaceClassName}`}>
                 <Icon size={18} strokeWidth={1.9} className={activity.iconClassName} />
               </span>
-              <span className="mt-1.5 block whitespace-nowrap text-[11px] font-semibold leading-tight tracking-[-0.01em] text-white/90">
+              <span className="mt-1.5 block whitespace-nowrap text-[11px] font-semibold leading-tight tracking-[-0.01em] text-white/95">
                 {activity.title}
               </span>
-              <span className="mt-1 block whitespace-nowrap text-[9px] font-medium leading-tight text-white/35">
+              <span className="mt-1 block whitespace-nowrap text-[9px] font-medium leading-tight text-white/58">
                 {activity.meta}
               </span>
             </motion.button>
