@@ -16,4 +16,3 @@ coverage/
 /premium-home-after.png
 /fix.cjs
 /src/check_images.ts
-/.github/workflows/deploy.yml
