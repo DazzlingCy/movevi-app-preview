@@ -4,6 +4,13 @@ import { weekendPeriod, periodOpen } from './weekendRelay';
 export const PUZZLE_DEMO_CLOCK='movevi-weekend-relay-demo-clock-v1';
 export const PUZZLE_LOBBY_LIMIT=10;
 
+/** The prototype previews an open activity by default, without changing its landing page. */
+export function getPuzzlePreviewMode(search:string):{enabled:boolean;openOnLoad:boolean} {
+  const params=new URLSearchParams(search),keys=['puzzleDemo','relayDemo'];
+  const enabled=!keys.some(key=>params.get(key)==='0');
+  return {enabled,openOnLoad:enabled&&keys.some(key=>params.get(key)==='1')};
+}
+
 export function joinPuzzleDemoPartner(state:PuzzleState,now:number):PuzzleState {
   const team=periodParticipation(state,weekendPeriod(now).id);
   return team&&team.members.length===1?joinPuzzle(state,team.id,{

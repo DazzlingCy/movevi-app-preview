@@ -1,11 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createPuzzlePreviewSession, finishPuzzleDemoPartner, puzzleDemoPeriodTime, seedPuzzleDemoLobby, unjoinedPuzzleWeekend } from './puzzleDemo';
+import { createPuzzlePreviewSession, finishPuzzleDemoPartner, getPuzzlePreviewMode, puzzleDemoPeriodTime, seedPuzzleDemoLobby, unjoinedPuzzleWeekend } from './puzzleDemo';
 import { createPuzzle, drawsLeft, emptyPuzzleState, finishPuzzle, joinPuzzle, openPuzzleTeams, ownPieces, periodParticipation, puzzleComplete, readPuzzle } from './puzzleTeam';
 import { weekendPeriod, periodOpen } from './weekendRelay';
 
 const FRIDAY=Date.parse('2026-10-30T01:00:00+08:00'),WEEK=7*86400000;
 const city={id:'tokyo',name:'东京',image:'/tokyo.jpg'};
+
+test('ordinary prototype links preview an open unjoined activity while only explicit deep links open the activity on load',()=>{
+  assert.deepEqual(getPuzzlePreviewMode(''),{enabled:true,openOnLoad:false});
+  assert.deepEqual(getPuzzlePreviewMode('?puzzleDemo=1'),{enabled:true,openOnLoad:true});
+  assert.deepEqual(getPuzzlePreviewMode('?relayDemo=1'),{enabled:true,openOnLoad:true});
+  assert.deepEqual(getPuzzlePreviewMode('?puzzleDemo=0'),{enabled:false,openOnLoad:false});
+  assert.deepEqual(getPuzzlePreviewMode('?puzzleDemo=1&relayDemo=0'),{enabled:false,openOnLoad:false});
+  const session=createPuzzlePreviewSession([city],Date.parse('2026-10-28T12:00:00+08:00'));
+  assert.equal(periodOpen(weekendPeriod(session.now),session.now),true);
+  assert.equal(periodParticipation(session.state,weekendPeriod(session.now).id),undefined);
+  assert.equal(openPuzzleTeams(session.state,session.now).slice(0,3).length,3);
+  assert.equal(openPuzzleTeams(session.state,session.now).length,10);
+});
 
 test('explicit partner action completes the selected third route and awards exactly 2+1 draws',()=>{
   let state=createPuzzle(emptyPuzzleState(),city,'preview-pair',FRIDAY);

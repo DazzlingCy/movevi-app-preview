@@ -29,6 +29,7 @@ import RouteDetailView from '../RouteDetailView';
 import RunPlaybackView from '../RunPlaybackView';
 import TeamRelayView from '../TeamRelayView';
 import { usePuzzleTeam } from '../../journey/usePuzzleTeam';
+import { getPuzzlePreviewMode } from '../../journey/puzzleDemo';
 import { periodParticipation, ownPieces, puzzleComplete, type PuzzleRoute } from '../../journey/puzzleTeam';
 import WeightLossPlanView from '../WeightLossPlanView';
 import WeekendMedleyView from '../WeekendMedleyView';
@@ -1490,10 +1491,10 @@ function UtilityPanel({ mode, deviceConnected, manualReducedMotion, onToggleDevi
 }
 
 export default function JourneyApp() {
-  const puzzleDemo = ['puzzleDemo', 'relayDemo'].some(key => new URLSearchParams(window.location.search).get(key) === '1');
+  const {enabled:puzzleDemo,openOnLoad:puzzleDeepLink}=getPuzzlePreviewMode(window.location.search);
   const [state, dispatch] = useReducer(journeyReducer, undefined, createDemoJourneyState);
   const nextStationFocusTimerRef = useRef<number | null>(null);
-  const [isFirstUse, setIsFirstUse] = useState(!puzzleDemo);
+  const [isFirstUse, setIsFirstUse] = useState(!puzzleDeepLink);
   const [firstCityChoiceId, setFirstCityChoiceId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PrimaryTab>('home');
   const [homeCityId, setHomeCityId] = useState(state.currentCityId);
@@ -1509,7 +1510,7 @@ export default function JourneyApp() {
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [focusNextStation, setFocusNextStation] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [legacyFeature, setLegacyFeature] = useState<LegacyFeature | null>(puzzleDemo?'teamRelay':null);
+  const [legacyFeature, setLegacyFeature] = useState<LegacyFeature | null>(puzzleDeepLink?'teamRelay':null);
   const [medalLotteryTickets, setMedalLotteryTickets] = useState(0);
   const [activityRoute, setActivityRoute] = useState<ActivityRouteTarget | null>(null);
   const [runningActivityRoute, setRunningActivityRoute] = useState<ActivityRouteTarget | null>(null);
