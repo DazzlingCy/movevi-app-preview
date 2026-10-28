@@ -4,8 +4,8 @@
 .intro strong { color:var(--wheel-ink); font-size:21px; font-weight:650; line-height:1.2; letter-spacing:0; }
 .intro:only-child { margin-inline:auto; }
 .page .contribution { flex:1; min-width:0; margin:0; color:#61717a; font-size:12px; line-height:1.6; text-align:left; }
-.frame { position:relative; width:min(100%,264px); aspect-ratio:1; margin:20px auto 0; padding:7px; border:1px solid #e7d7b7; border-radius:50%; background:#fffcf5; box-shadow:0 8px 22px #273d4610; }
-.wheel { width:100%; height:100%; position:relative; border-radius:50%; border:5px solid #e7ca92; background:conic-gradient(#fff2da 0deg 60deg,#e1efec 60deg 120deg,#fff2da 120deg 180deg,#e1efec 180deg 240deg,#fff2da 240deg 300deg,#e1efec 300deg); transition:transform 3.2s cubic-bezier(.14,.7,.13,1); }
+.frame { position:relative; box-sizing:border-box; width:min(100%,264px); aspect-ratio:1 / 1; flex:none; margin:20px auto 0; padding:7px; border:1px solid #e7d7b7; border-radius:50%; background:#fffcf5; box-shadow:0 8px 22px #273d4610; }
+.wheel { position:absolute; inset:7px; border-radius:50%; border:5px solid #e7ca92; background:conic-gradient(#fff2da 0deg 60deg,#e1efec 60deg 120deg,#fff2da 120deg 180deg,#e1efec 180deg 240deg,#fff2da 240deg 300deg,#e1efec 300deg); transition:transform 3.2s cubic-bezier(.14,.7,.13,1); }
 .prize { position:absolute; transform:translate(-50%,-50%); white-space:nowrap; }
 .prize b { display:block; font-size:16px; color:var(--wheel-ink); font-weight:650; transition:transform 3.2s cubic-bezier(.14,.7,.13,1); }
 .pointer { position:absolute; z-index:2; top:-4px; left:calc(50% - 10px); width:0; height:0; border-left:10px solid transparent; border-right:10px solid transparent; border-top:24px solid var(--wheel-ink); filter:drop-shadow(0 2px 1px #ffffff80); }
