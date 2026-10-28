@@ -7,6 +7,28 @@ import { weekendPeriod, periodOpen } from './weekendRelay';
 const FRIDAY=Date.parse('2026-10-30T01:00:00+08:00'),WEEK=7*86400000;
 const city={id:'tokyo',name:'东京',image:'/tokyo.jpg'};
 
+for(const ownCompleted of [0,1,2])test(`partner can finish after ${ownCompleted} own routes and preserves 2+1 rewards`,()=>{
+  let state=createPuzzle(emptyPuzzleState(),city,'free-order',FRIDAY);
+  const thirdRoute={...city,routeId:'partner-route',routeIndex:3,title:'搭子路线',distanceKm:4,minutes:30};
+  assert.equal(finishPuzzleDemoPartner(state,FRIDAY,thirdRoute),state);
+  state=joinPuzzle(state,'free-order',{id:'partner',name:'小林',joinedAt:FRIDAY});
+  const finishSelf=(index:number)=>{
+    const route={...city,routeId:'own-route-'+index,routeIndex:index+1,title:'本人路线'+index,distanceKm:3,minutes:20};
+    state=finishPuzzle(state,'free-order',{id:'own-'+index,memberId:'self',slot:state.teams[0].pieces.length,route,startedAt:FRIDAY,finishedAt:FRIDAY,distanceKm:3});
+  };
+  for(let i=0;i<ownCompleted;i++)finishSelf(i);
+  assert.equal(finishPuzzleDemoPartner(state,weekendPeriod(FRIDAY).endsAt,thirdRoute),state);
+  assert.equal(finishPuzzleDemoPartner(state,FRIDAY,{...thirdRoute,id:'another-city'}),state);
+  state=finishPuzzleDemoPartner(state,FRIDAY,thirdRoute);
+  assert.equal(ownPieces(state.teams[0],'partner').length,1);
+  assert.equal(finishPuzzleDemoPartner(state,FRIDAY,thirdRoute),state);
+  assert.equal(drawsLeft(state.teams[0]),ownCompleted===2?2:0);
+  for(let i=ownCompleted;i<2;i++)finishSelf(i);
+  assert.equal(puzzleComplete(state.teams[0]),true);
+  assert.equal(drawsLeft(state.teams[0]),2);
+  assert.equal(drawsLeft(state.teams[0],'partner'),1);
+});
+
 test('ordinary prototype links preview an open unjoined activity while only explicit deep links open the activity on load',()=>{
   assert.deepEqual(getPuzzlePreviewMode(''),{enabled:true,openOnLoad:false});
   assert.deepEqual(getPuzzlePreviewMode('?puzzleDemo=1'),{enabled:true,openOnLoad:true});

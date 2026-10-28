@@ -21,12 +21,13 @@ export function joinPuzzleDemoPartner(state:PuzzleState,now:number):PuzzleState 
 /** Invoked explicitly by the preview's partner-completion button. */
 export function finishPuzzleDemoPartner(state:PuzzleState,now:number,selectedRoute?:PuzzleRoute):PuzzleState {
   const team=periodParticipation(state,weekendPeriod(now).id);
-  if(!team||team.archived||team.members.length!==2||!periodOpen(team.period,now)||team.pieces.length!==2)return state;
+  if(!team||team.archived||team.members.length!==2||!periodOpen(team.period,now)||team.pieces.length>=3)return state;
   const own=ownPieces(team),partner=team.members.find(member=>member.id!=='self');
-  if(own.length!==2||!partner)return state;
-  const route=selectedRoute??own[0].route;
+  if(!partner||ownPieces(team,partner.id).length)return state;
+  const route=selectedRoute??(own.length===2?own[0].route:undefined);
+  if(!route)return state;
   return finishPuzzle(state,team.id,{
-    id:'demo-partner-finish-'+team.id,memberId:partner.id,slot:2,route,
+    id:'demo-partner-finish-'+team.id,memberId:partner.id,slot:team.pieces.length,route,
     startedAt:now,finishedAt:now,distanceKm:route.distanceKm,
   },now);
 }

@@ -36,11 +36,11 @@ test('current preview flow: create, simulated join, two own routes, explicit thi
   assert.equal(finishPuzzle(state,team().id,record(0),now),state);
   assert.equal(createPuzzle(state,routes[0],'duplicate-team',now),state);
   assert.equal(joinPuzzle(state,openPuzzleTeams(state,now)[0].id,{id:'self',name:'你',joinedAt:now}),state);
+  assert.equal(finishPuzzleDemoPartner(state,now,routes[2]),state,'partner completion requires a full team');
   now++;
   persist(joinPuzzleDemoPartner(state,now));
   assert.equal(team().members.length,2);assert.equal(team().members[1].name,'小林');
   assert.equal(joinPuzzleDemoPartner(state,now),state);
-  assert.equal(finishPuzzleDemoPartner(state,now,routes[2]),state);
   for(let index=0;index<2;index++) {
     now++;const piece=record(index);persist(finishPuzzle(state,team().id,piece,now));
     assert.equal(team().pieces.length,index+1);
