@@ -5,11 +5,27 @@ import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const appVersion = process.env.GITHUB_SHA || `local-${Date.now()}`;
+
   return {
     base: './', // 设为相对路径，方便 GitHub Pages 部署或本地预览
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'emit-app-version',
+        generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'version.json',
+            source: JSON.stringify({version: appVersion}),
+          });
+        },
+      },
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+      __APP_VERSION__: JSON.stringify(appVersion),
     },
     resolve: {
       alias: {

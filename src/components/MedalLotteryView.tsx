@@ -103,7 +103,7 @@ export default function MedalLotteryView({ tickets, onBack, onGoRun, onDraw }: M
               <ChevronLeft size={22} />
             </button>
             <div className="text-center">
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">MEDAL LOTTERY</p>
+              <p className="text-[10px] font-black tracking-[0.25em] text-slate-500">勋章抽奖</p>
               <h1 className="text-xl font-black tracking-tight text-white">勋章抽奖</h1>
             </div>
             <button className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] text-slate-300 backdrop-blur-md">
@@ -174,7 +174,7 @@ export default function MedalLotteryView({ tickets, onBack, onGoRun, onDraw }: M
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <Panel className="p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">CURRENT</p>
+              <p className="text-[10px] font-black tracking-[0.18em] text-slate-500">当前</p>
               <p className="mt-2 text-sm font-black text-white">本期活动</p>
               <div className="mt-3 space-y-1.5 font-mono text-xs font-bold tabular-nums text-slate-400">
                 <p>开始 2025/09/01</p>
@@ -182,7 +182,7 @@ export default function MedalLotteryView({ tickets, onBack, onGoRun, onDraw }: M
               </div>
             </Panel>
             <Panel className="p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">NEXT</p>
+              <p className="text-[10px] font-black tracking-[0.18em] text-slate-500">下一段</p>
               <p className="mt-2 text-sm font-black text-white">下期时间</p>
               <p className="mt-3 text-xs font-bold leading-5 text-slate-400">本期结束后的 1-3 个工作日开放</p>
             </Panel>

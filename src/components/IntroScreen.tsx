@@ -18,7 +18,7 @@ const introSteps = [
     id: 'step2',
     title: '母星回音',
     subtitle: 'ECHOES OF EARTH',
-    text: '走向宇宙深处，人们却越发想念那颗蓝色的母星。想念巴黎清晨的雾，想念开罗金字塔前的热风，想念南京城墙下梧桐落叶的声音...',
+    text: '走向宇宙深处，人们却越发想念那颗蓝色的母星。想念巴黎清晨的雾，想念开罗金字塔前的热风，想念新加坡滨海湾海风穿城的声音...',
     image: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=90&w=1200&auto=format&fit=crop', // City neon/nostalgia
   },
   {
@@ -60,7 +60,7 @@ export default function IntroScreen({ onComplete }: IntroScreenProps) {
             className="absolute inset-0"
           >
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#05070A]/80 to-[#05070A] z-10" />
-            <img src={step.image} alt={step.title} className="w-full h-full object-cover" />
+            <img src={step.image} alt={step.title} className="w-full h-full object-cover" loading="lazy" decoding="async" />
           </motion.div>
         </AnimatePresence>
         

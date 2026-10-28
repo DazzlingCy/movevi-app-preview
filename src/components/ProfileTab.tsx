@@ -1,6 +1,22 @@
-import { Settings, ChevronRight, Mail, SquarePen, Medal, Map as MapIcon, MonitorSmartphone, Wallet, HeadphonesIcon, FileText, BookOpen, ClipboardList } from 'lucide-react';
+import {
+  BookOpen,
+  ChevronRight,
+  ClipboardList,
+  HeadphonesIcon,
+  Mail,
+  Map as MapIcon,
+  Medal,
+  MessageSquare,
+  MonitorSmartphone,
+  Settings,
+  Sparkles,
+  SquarePen,
+  Wallet
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { getGlowRank } from '../lib/glow';
+import type { AuthUser } from './AuthView';
+import type { AccountFeatureKind } from './AccountFeatureView';
 
 interface UserStats {
   completedCities: number;
@@ -11,130 +27,168 @@ interface UserStats {
   lifetimeLightValue?: number;
 }
 
-export default function ProfileTab({ userStats }: { userStats: UserStats }) {
+interface ProfileTabProps {
+  userStats: UserStats;
+  authUser?: AuthUser | null;
+  onOpenAuth?: () => void;
+  onOpenSettings?: () => void;
+  onOpenFeature?: (feature: AccountFeatureKind) => void;
+  onOpenRouteCollection?: () => void;
+  onOpenWechatSupport?: () => void;
+}
+
+export default function ProfileTab({ userStats, authUser, onOpenAuth, onOpenSettings, onOpenFeature, onOpenRouteCollection, onOpenWechatSupport }: ProfileTabProps) {
   const rankInfo = getGlowRank(userStats.lifetimeLightValue ?? userStats.lightValue ?? 0);
-  const stats = [
+  const displayName = authUser?.name || '登录 / 注册';
+  const openProfile = () => {
+    if (authUser) {
+      onOpenFeature?.('profileEdit');
+      return;
+    }
+    onOpenAuth?.();
+  };
+  const statItems = [
     { label: '完成城市', value: userStats.completedCities.toString() },
     { label: '完成路线', value: userStats.completedRoutes.toString() },
     { label: '运动里程', value: userStats.totalDistance.toFixed(1), unit: 'km' },
-    { label: '运动时长', value: userStats.totalTimeHours.toFixed(1), unit: 'h' },
+    { label: '运动时长', value: userStats.totalTimeHours.toFixed(1), unit: 'h' }
   ];
 
   const menuItems = [
-    { icon: ClipboardList, label: '运动记录' },
-    { icon: MonitorSmartphone, label: '我的设备' },
-    { icon: Wallet, label: '我的钱包' },
-    { icon: HeadphonesIcon, label: '在线客服' },
-    { icon: FileText, label: '问题反馈' },
-    { icon: BookOpen, label: '使用说明' },
-    { icon: Settings, label: '设置' },
+    { icon: ClipboardList, label: '运动记录', feature: 'records' as AccountFeatureKind },
+    { icon: MonitorSmartphone, label: '我的设备', feature: 'device' as AccountFeatureKind },
+    { icon: Wallet, label: '我的钱包', feature: 'wallet' as AccountFeatureKind },
+    { icon: MessageSquare, label: '问题反馈', feature: 'service' as AccountFeatureKind },
+    { icon: HeadphonesIcon, label: '添加企微', onClick: onOpenWechatSupport },
+    { icon: BookOpen, label: '使用说明', feature: 'guide' as AccountFeatureKind },
+    { icon: Settings, label: '设置', onClick: onOpenSettings }
   ];
 
   return (
-    <div className="w-full h-full bg-[#05070A] overflow-y-auto pb-24 text-slate-100 font-sans hide-scrollbar">
-      {/* Header Profile Info */}
-      <div className="relative pt-12 pb-16 px-6 bg-gradient-to-b from-cyan-900/20 via-cyan-900/5 to-transparent">
-        <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-cyan-500/10 to-transparent pointer-events-none blur-3xl" />
-        
-        {/* Top bar with icons */}
-        <div className="flex justify-end gap-5 mb-2 relative z-10">
-          <button className="text-slate-300 hover:text-cyan-400 transition-colors">
-            <Mail size={22} />
+    <div className="h-full w-full overflow-y-auto bg-[#05070A] pb-24 text-slate-100 hide-scrollbar">
+      <div className="relative overflow-hidden px-5 pb-8 pt-12">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(34,211,238,0.22),transparent_36%),radial-gradient(circle_at_86%_6%,rgba(251,191,36,0.12),transparent_34%),linear-gradient(180deg,rgba(8,47,73,0.48),transparent_78%)]" />
+        <div className="relative flex justify-end gap-4">
+          <button
+            type="button"
+            onClick={() => onOpenFeature?.('messages')}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-slate-200 backdrop-blur-md active:scale-95"
+            aria-label="消息"
+          >
+            <Mail size={20} />
           </button>
-          <button className="text-slate-300 hover:text-cyan-400 transition-colors">
-            <SquarePen size={22} />
+          <button
+            type="button"
+            onClick={openProfile}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-slate-200 backdrop-blur-md active:scale-95"
+            aria-label={authUser ? '编辑资料' : '登录或注册'}
+          >
+            <SquarePen size={20} />
           </button>
         </div>
 
-        <div className="flex flex-col items-start gap-4 relative z-10 border-b border-white/5 pb-8">
-          <div className="flex items-center gap-4 w-full">
-            <div className="w-20 h-20 rounded-full border-2 border-cyan-400/50 p-1 relative shadow-[0_0_20px_rgba(34,211,238,0.2)] bg-[#05070A] shrink-0">
-              <img 
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200" 
-                alt="Avatar" 
-                className="w-full h-full rounded-full object-cover"
-              />
-            </div>
-            
-            <div className="flex-1 flex flex-col justify-center">
-              <h1 className="text-xl font-bold text-slate-100 tracking-wide mb-2">尘缘</h1>
-              <div className="flex items-center gap-2">
-                <span className={`bg-gradient-to-r ${rankInfo.current.color} text-slate-950 text-xs font-bold px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.3)]`}>
+        <section className="relative mt-4 rounded-[32px] border border-cyan-200/15 bg-[#081019]/82 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.36)] backdrop-blur-xl">
+          <div className="absolute inset-0 rounded-[32px] bg-[linear-gradient(135deg,rgba(255,255,255,0.07),transparent_44%),radial-gradient(circle_at_92%_0%,rgba(251,191,36,0.14),transparent_42%)]" />
+          <div className="relative flex items-center gap-4">
+            <button
+              type="button"
+              onClick={openProfile}
+              className={`h-[78px] w-[78px] shrink-0 rounded-full bg-gradient-to-br ${rankInfo.current.color} p-[2px] shadow-[0_0_34px_rgba(103,232,249,0.18)] active:scale-95`}
+              aria-label={authUser ? '查看或编辑资料' : '登录或注册'}
+            >
+              <div className="h-full w-full rounded-full bg-slate-950 p-1">
+                <img
+                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200"
+                  alt="头像"
+                  className="h-full w-full rounded-full object-cover"
+                />
+              </div>
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-2xl font-black tracking-tight text-white">{displayName}</h1>
+              <div className="mt-2 flex items-center gap-2">
+                <span className={`rounded-full bg-gradient-to-r ${rankInfo.current.color} px-2.5 py-1 text-[11px] font-black text-slate-950 shadow-[0_0_16px_rgba(251,191,36,0.24)]`}>
                   LV.{rankInfo.current.level}
                 </span>
-                <span className="text-amber-400 text-sm font-semibold tracking-widest drop-shadow-[0_0_5px_rgba(251,191,36,0.4)]">
-                  {rankInfo.current.name}
-                </span>
+                <span className="text-sm font-black text-amber-300">{rankInfo.current.name}</span>
               </div>
             </div>
           </div>
 
-          {/* Stats Row */}
-          <div className="w-full flex items-center justify-between mt-4">
-            {stats.map((stat, idx) => (
-              <div key={idx} className="flex flex-col items-center">
-                <div className="text-2xl font-bold text-slate-100 font-mono tracking-wider relative">
-                  {stat.value}
-                  {stat.unit && <span className="text-sm text-slate-400 ml-0.5 relative -top-1">{stat.unit}</span>}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-1">{stat.label}</div>
+          <div className="relative mt-6 grid grid-cols-4 gap-2">
+            {statItems.map(item => (
+              <div key={item.label} className="rounded-2xl border border-white/[0.08] bg-white/[0.045] px-2 py-3 text-center">
+                <p className="font-mono text-lg font-black tracking-[-0.03em] text-white">
+                  {item.value}
+                  {item.unit && <span className="ml-0.5 text-[10px] text-slate-500">{item.unit}</span>}
+                </p>
+                <p className="mt-1 text-[10px] font-bold text-slate-500">{item.label}</p>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       </div>
 
-      <div className="px-5 space-y-6 -mt-8 relative z-20">
-        {/* Action Cards */}
-        <div className="grid grid-cols-2 gap-4">
-          <motion.div 
-            whileTap={{ scale: 0.95 }}
-            className="bg-gradient-to-br from-amber-500/10 to-transparent border border-amber-500/20 rounded-2xl p-4 relative overflow-hidden backdrop-blur-xl shadow-lg cursor-pointer"
+      <div className="relative z-10 -mt-3 space-y-5 px-5">
+        <div className="grid grid-cols-2 gap-3">
+          <motion.button
+            type="button"
+            onClick={onOpenRouteCollection}
+            whileTap={{ scale: 0.97 }}
+            className="relative col-span-2 overflow-hidden rounded-[26px] border border-cyan-200/20 bg-[#08121b] p-4 text-left shadow-xl"
           >
-            <div className="absolute right-[-10px] top-[-10px] opacity-20 pointer-events-none">
-              <Medal size={80} className="text-amber-500" />
+            <div className="absolute -right-7 -top-10 text-cyan-200/[0.07]">
+              <MapIcon size={132} />
             </div>
-            <div className="text-amber-400 mb-1">
-              <Medal size={28} className="drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
+            <div className="relative flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black tracking-[0.2em] text-cyan-200/60">CITY COLLECTION</p>
+                <h3 className="mt-1 text-lg font-black text-white">城市收藏</h3>
+                <p className="mt-1 text-[11px] font-bold text-slate-500">景点勋章 · 城市卡片 · 光迹徽章</p>
+              </div>
+              <div className="flex shrink-0 items-center -space-x-1.5" aria-hidden="true">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-amber-200/40 bg-[#16130b] text-amber-100 shadow-lg">
+                  <Medal size={20} />
+                </span>
+                <span className="relative z-[1] flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-cyan-200/35 bg-[#0b1c29] text-cyan-100 shadow-lg">
+                  <MapIcon size={21} />
+                </span>
+                <span className="relative z-[2] flex h-11 w-11 items-center justify-center rounded-full border-2 border-emerald-200/35 bg-[#0b1d19] text-emerald-100 shadow-lg">
+                  <Sparkles size={19} />
+                </span>
+              </div>
             </div>
-            <h3 className="text-slate-100 font-bold mb-1 mt-3">成就勋章</h3>
-            <p className="text-[10px] text-amber-200/60 break-words whitespace-pre-wrap">满载而归的荣誉感</p>
-          </motion.div>
-
-          <motion.div 
-            whileTap={{ scale: 0.95 }}
-            className="bg-gradient-to-br from-cyan-500/10 to-transparent border border-cyan-500/20 rounded-2xl p-4 relative overflow-hidden backdrop-blur-xl shadow-lg cursor-pointer"
-          >
-            <div className="absolute right-[-10px] top-[-10px] opacity-20 pointer-events-none">
-              <MapIcon size={80} className="text-cyan-500" />
-            </div>
-            <div className="text-cyan-400 mb-1">
-              <MapIcon size={28} className="drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
-            </div>
-            <h3 className="text-slate-100 font-bold mb-1 mt-3">城市卡片</h3>
-            <p className="text-[10px] text-cyan-200/60 break-words whitespace-pre-wrap">不期而遇的城中事</p>
-          </motion.div>
+          </motion.button>
         </div>
 
-        {/* Menu Items */}
-        <div className="bg-white/5 border border-white/5 rounded-3xl overflow-hidden backdrop-blur-xl">
-          {menuItems.map((item, idx) => {
+        <section className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.045] shadow-2xl backdrop-blur-xl">
+          {menuItems.map((item, index) => {
             const Icon = item.icon;
             return (
               <motion.button
-                key={idx}
-                whileTap={{ backgroundColor: "rgba(255,255,255,0.1)" }}
-                className={`w-full flex items-center justify-between p-5 transition-colors ${idx !== menuItems.length - 1 ? 'border-b border-white/5' : ''}`}
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  if ('feature' in item && item.feature) {
+                    onOpenFeature?.(item.feature);
+                    return;
+                  }
+                  item.onClick?.();
+                }}
+                whileTap={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+                className={`flex w-full items-center justify-between px-5 py-4 text-left ${index !== menuItems.length - 1 ? 'border-b border-white/[0.06]' : ''}`}
               >
-                <div className="flex items-center gap-4">
-                  <Icon size={20} className="text-slate-400" />
-                  <span className="text-slate-200 font-medium tracking-wide text-sm">{item.label}</span>
-                </div>
+                <span className="flex items-center gap-4">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900/80 text-slate-300">
+                    <Icon size={19} />
+                  </span>
+                  <span className="text-sm font-black text-slate-100">{item.label}</span>
+                </span>
                 <ChevronRight size={18} className="text-slate-600" />
               </motion.button>
             );
           })}
-        </div>
+        </section>
       </div>
     </div>
   );

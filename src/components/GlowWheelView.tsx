@@ -3,8 +3,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft, Gift, Info, Sparkles, Ticket, Trophy, X, Zap } from 'lucide-react';
 import { getGlowRank, getGlowWheelDailyExchangeLimit, GLOW_WHEEL_EXCHANGE_RULE_TEXT } from '../lib/glow';
 
-const GLOW_WHEEL_COST = 5;
-
 const CASH_PRIZES = [
   { amount: 0.18, weight: 45, color: '#7dd3fc' },
   { amount: 0.38, weight: 30, color: '#a5b4fc' },
@@ -17,7 +15,7 @@ const CASH_PRIZES = [
 interface GlowWheelViewProps {
   userStats: any;
   onBack: () => void;
-  onExchangeChance: (cost: number) => { success: boolean; message: string };
+  onClaimChance: () => { success: boolean; message: string };
   onDraw: (amount: number) => { success: boolean; message: string };
 }
 
@@ -51,7 +49,7 @@ const pickPrize = () => {
   return CASH_PRIZES[0];
 };
 
-export default function GlowWheelView({ userStats, onBack, onExchangeChance, onDraw }: GlowWheelViewProps) {
+export default function GlowWheelView({ userStats, onBack, onClaimChance, onDraw }: GlowWheelViewProps) {
   const [rotation, setRotation] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState<number | null>(null);
@@ -65,7 +63,7 @@ export default function GlowWheelView({ userStats, onBack, onExchangeChance, onD
   const dailyExchangeLimit = getGlowWheelDailyExchangeLimit(glowRank.level);
   const exchangedToday = userStats?.dailyGlowWheelExchangeCount || 0;
   const exchangeLimitReached = exchangedToday >= dailyExchangeLimit;
-  const canExchange = lightValue >= GLOW_WHEEL_COST && !exchangeLimitReached;
+  const canExchange = !exchangeLimitReached;
   const canDraw = tickets > 0 && !isSpinning;
 
   useEffect(() => {
@@ -82,14 +80,14 @@ export default function GlowWheelView({ userStats, onBack, onExchangeChance, onD
   };
 
   const handleExchange = () => {
-    const response = onExchangeChance(GLOW_WHEEL_COST);
+    const response = onClaimChance();
     showToast(response.message);
   };
 
   const handleSpin = () => {
     if (isSpinning) return;
     if (tickets <= 0) {
-      showToast('请先兑换现金抽奖券');
+      showToast('请先领取现金抽奖券');
       return;
     }
 
@@ -132,7 +130,7 @@ export default function GlowWheelView({ userStats, onBack, onExchangeChance, onD
               <ChevronLeft size={22} />
             </button>
             <div className="text-center">
-              <p className="text-[10px] font-black tracking-[0.26em] text-indigo-200">GLOW CASH</p>
+              <p className="text-[10px] font-black tracking-[0.26em] text-indigo-200">光迹现金</p>
               <h1 className="mt-1 text-xl font-black tracking-tight text-white">光迹值现金抽奖</h1>
             </div>
             <button
@@ -147,11 +145,7 @@ export default function GlowWheelView({ userStats, onBack, onExchangeChance, onD
 
         <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 hide-scrollbar">
           <section className="rounded-[24px] border border-white/10 bg-[#0b1018]/90 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42)]">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                <p className="text-[10px] font-semibold text-slate-500">光迹余额</p>
-                <p className="mt-1 font-mono text-xl font-black text-cyan-100 tabular-nums">{lightValue}</p>
-              </div>
+            <div className="grid grid-cols-2 gap-2">
               <div className="rounded-2xl border border-indigo-300/20 bg-indigo-300/10 p-3">
                 <p className="text-[10px] font-semibold text-indigo-100/70">抽奖券</p>
                 <p className="mt-1 font-mono text-xl font-black text-indigo-100 tabular-nums">{tickets}</p>
@@ -171,7 +165,7 @@ export default function GlowWheelView({ userStats, onBack, onExchangeChance, onD
                 <div className="relative flex items-start justify-between gap-2">
                   <div>
                     <p className={`text-[10px] font-black ${canExchange ? 'text-[#062033]/70' : 'text-slate-500'}`}>
-                      {exchangeLimitReached ? '今日已满' : '立即兑换'}
+                      {exchangeLimitReached ? '今日已满' : '今日领取'}
                     </p>
                     <p className="mt-1 text-sm font-black leading-tight">抽奖券</p>
                   </div>
@@ -182,8 +176,8 @@ export default function GlowWheelView({ userStats, onBack, onExchangeChance, onD
                   </span>
                 </div>
                 <div className="relative mt-2 flex items-center justify-between">
-                  <span className={`text-[10px] font-bold ${canExchange ? 'text-[#062033]/70' : 'text-slate-500'}`}>消耗</span>
-                  <span className="font-mono text-lg font-black tabular-nums">-{GLOW_WHEEL_COST}</span>
+                  <span className={`text-[10px] font-bold ${canExchange ? 'text-[#062033]/70' : 'text-slate-500'}`}>免费</span>
+                  <span className="font-mono text-lg font-black tabular-nums">+1</span>
                 </div>
               </button>
             </div>
@@ -191,7 +185,7 @@ export default function GlowWheelView({ userStats, onBack, onExchangeChance, onD
             <div className="mt-4 rounded-[22px] border border-white/10 bg-[#070b12] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-black tracking-[0.22em] text-indigo-200">LIVE DRAW</p>
+                  <p className="text-[10px] font-black tracking-[0.22em] text-indigo-200">实时抽奖</p>
                   <h2 className="mt-1 text-base font-black text-white">现金奖池转盘</h2>
                 </div>
                 <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-bold text-slate-400">
@@ -344,7 +338,7 @@ export default function GlowWheelView({ userStats, onBack, onExchangeChance, onD
                 {drawHistory.map((record, index) => (
                   <div key={record.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
                     <div>
-                      <p className="text-xs font-black text-white">木小六</p>
+                      <p className="text-xs font-black text-white">沐小六</p>
                       <p className="mt-1 text-[10px] font-bold text-slate-500">{record.createdAt}</p>
                     </div>
                     <p className="font-mono text-base font-black text-cyan-100 tabular-nums">+¥{record.amount.toFixed(2)}</p>
@@ -425,16 +419,16 @@ export default function GlowWheelView({ userStats, onBack, onExchangeChance, onD
 
               <div className="relative mt-5 space-y-3">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
-                  <p className="text-xs font-black text-indigo-100">兑换方式</p>
+                  <p className="text-xs font-black text-indigo-100">领取方式</p>
                   <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-400">
-                    消耗 {GLOW_WHEEL_COST} 点光迹值可兑换 1 张现金抽奖券，每次抽奖消耗 1 张券。
+                    每日可免费领取现金抽奖券，每次抽奖消耗 1 张券，不消耗光迹值。
                   </p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
                   <p className="text-xs font-black text-cyan-100">每日上限</p>
                   <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-400">{GLOW_WHEEL_EXCHANGE_RULE_TEXT}</p>
                   <p className="mt-2 font-mono text-xs font-black text-cyan-200">
-                    当前{glowRank.name}：今日已兑 {exchangedToday}/{dailyExchangeLimit} 张
+                    当前{glowRank.name}：今日已领 {exchangedToday}/{dailyExchangeLimit} 张
                   </p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">

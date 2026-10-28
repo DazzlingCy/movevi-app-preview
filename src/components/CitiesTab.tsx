@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Play } from 'lucide-react';
 import { CITIES_BY_CONTINENT, CONTINENTS_ORDER, CityData } from '../data/cities';
 import { cn } from '../lib/utils';
+import CityImage from './CityImage';
 
 const CONTINENT_ICONS: Record<string, string> = {
   '中国': '🏯',
@@ -78,9 +79,10 @@ export default function CitiesTab({ onCityClick }: { onCityClick?: (city: CityDa
                 className="bg-white/5 rounded-2xl overflow-hidden border border-white/10 shadow-lg flex p-2.5 gap-4 cursor-pointer hover:bg-white/10 transition-colors"
               >
                 <div className="relative w-[110px] h-[110px] shrink-0 rounded-xl overflow-hidden">
-                  <img 
+                  <CityImage
                     src={city.image} 
                     alt={city.name}
+                    fallbackLabel={city.name}
                     className="absolute inset-0 w-full h-full object-cover" 
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-80" />

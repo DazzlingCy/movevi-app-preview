@@ -1,3 +1,4 @@
+import StickyHeroNav from './StickyHeroNav';
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -70,19 +71,19 @@ export const MEDLEY_CANDIDATE_ROUTES: MedleyRouteItem[] = [
     countryName: '中国'
   },
   {
-    id: '4-1',
-    cityId: '4',
+    id: '15-1',
+    cityId: '15',
     routeIndex: 1,
-    cityName: '南京',
-    routeName: '金陵古都路线',
-    title: '南京·金陵古都之行',
-    image: 'https://images.unsplash.com/photo-1547984609-444491a57c13?auto=format&fit=crop&w=500&q=80',
-    spots: '玄武湖 — 台城明城墙 — 夫子庙',
-    intro: '登上饱经风霜的台城明城墙，在风中聆听金陵帝王州的岁月绝唱。',
-    distance: '4.8',
-    duration: '约 28 分钟',
-    rating: 4.9,
-    countryName: '中国'
+    cityName: '???',
+    routeName: '?????????',
+    title: '???????????',
+    image: 'https://images.unsplash.com/photo-1525625293386-3f8f99389edd?auto=format&fit=crop&w=500&q=80',
+    spots: '????? ? ????? ? ?????',
+    intro: '?????????????????????????????????????????????',
+    distance: '4.6',
+    duration: '? 28 ??',
+    rating: 4.8,
+    countryName: '???'
   },
   {
     id: '5-1',
@@ -205,8 +206,8 @@ export const MEDLEY_CANDIDATE_ROUTES: MedleyRouteItem[] = [
     countryName: '中国'
   },
   {
-    id: '15-1',
-    cityId: '15',
+    id: '10-1',
+    cityId: '10',
     routeIndex: 1,
     cityName: '悉尼',
     routeName: '海港桥海岸漫步',
@@ -660,7 +661,7 @@ export default function WeekendMedleyView({
         ctx.stroke();
 
         // 4. Explorer Information Text
-        // Draw decorative Profile Avatar Circle on Canvas representing 木小六
+        // Draw decorative Profile Avatar Circle on Canvas representing 沐小六
         ctx.strokeStyle = '#D9A74E';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -679,7 +680,7 @@ export default function WeekendMedleyView({
 
         ctx.font = 'bold 28px sans-serif';
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText('木小六', 300, 220);
+        ctx.fillText('沐小六', 300, 220);
 
         // 5. Drawing stats grids (Distance / completed nodes)
         ctx.fillStyle = '#0F172A';
@@ -845,7 +846,7 @@ export default function WeekendMedleyView({
 
       const newUserRecord: GlobalDrawRecord = {
         id: `user-${Date.now()}`,
-        nickname: '木小六 (我)',
+        nickname: '沐小六 (我)',
         amount: rolledValue,
         time: '刚刚',
         isCurrentUser: true
@@ -928,7 +929,7 @@ export default function WeekendMedleyView({
 
                   {/* Miniature Poster Simulation rendering identical output as canvas */}
                   <div className="text-center py-1">
-                    <span className="text-[7.5px] text-amber-500/80 tracking-widest font-mono block font-black">WEEKEND MEMORY</span>
+                    <span className="text-[7.5px] text-amber-500/80 tracking-widest font-mono block font-black">周末记忆</span>
                     <h3 className="text-sm font-black bg-gradient-to-r from-amber-200 via-amber-300 to-[#ffe285] bg-clip-text text-transparent mt-1 tracking-wider filter drop-shadow-[0_2px_4px_rgba(245,208,110,0.15)]">城市记忆串烧・结业荣耀</h3>
                     <div className="w-12 h-[1px] bg-gradient-to-r from-transparent via-amber-500/30 to-transparent mx-auto mt-2" />
                   </div>
@@ -944,7 +945,7 @@ export default function WeekendMedleyView({
                       />
                       <span className="absolute -bottom-1 -right-1 px-1 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-[6px] font-black text-slate-950 scale-90 border border-slate-950 leading-none">LV2</span>
                     </div>
-                    <span className="text-xs font-black text-slate-100">{`木小六`}</span>
+                    <span className="text-xs font-black text-slate-100">{`沐小六`}</span>
                   </div>
 
                   {/* Highlights statistics row */}
@@ -1717,7 +1718,7 @@ export default function WeekendMedleyView({
                 </div>
 
                 <h3 className="text-lg font-black text-yellow-200 tracking-widest mt-4">恭喜翻中现金大吉！</h3>
-                <p className="text-[10px] text-yellow-100/50 mt-1 uppercase font-mono tracking-widest font-bold">CASH REWARD SECURED</p>
+                <p className="text-[10px] text-yellow-100/50 mt-1 font-mono tracking-widest font-bold">现金奖励已锁定</p>
 
                 <div className="my-6">
                   <span className="text-slate-100 font-sans text-xs font-bold leading-none pr-1">¥</span>
@@ -1766,13 +1767,41 @@ export default function WeekendMedleyView({
       {/* Scrollable View Containment */}
       <div className="flex-1 overflow-y-auto pb-36 hide-scrollbar flex flex-col">
         
+        <StickyHeroNav>
+          <button
+            onClick={onBack}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/60 border border-white/10 backdrop-blur-md transition-colors"
+            title="返回"
+          >
+            <ChevronLeft size={20} className="text-slate-200" />
+          </button>
+
+          <div className="flex items-center gap-2 select-none">
+            <button
+              onClick={() => setSimulateNotStarted(prev => !prev)}
+              className={`px-2 py-1.5 rounded-full text-[9px] font-black border transition-all active:scale-95 flex items-center gap-1 shrink-0 shadow-md ${
+                simulateNotStarted
+                  ? 'bg-amber-950/50 border-amber-500/40 text-amber-400'
+                  : 'bg-black/50 border-white/5 text-slate-400 hover:text-slate-200'
+              }`}
+              title="一键切换：模拟活动未开放状态"
+            >
+              <span>{simulateNotStarted ? '已设未开始' : '模拟未开始'}</span>
+            </button>
+
+            <div className="bg-[#12231c]/70 border border-emerald-500/20 px-3 py-1.5 rounded-full text-[10px] font-black text-emerald-400 tracking-wider flex items-center gap-1.5 shadow-[0_4px_12px_rgba(16,185,129,0.15)]">
+              <span>📅 周末限时开放</span>
+            </div>
+          </div>
+        </StickyHeroNav>
+
         {/* 1. Header Hero Area (Poster Style with image backdrop) */}
-        <div className="relative w-full shrink-0 overflow-hidden bg-[#03060a]">
+        <div className="relative w-full shrink-0 overflow-hidden bg-[#03060a] pt-[calc(56px+max(16px,env(safe-area-inset-top)))]">
           {/* Unsplash beautiful high-quality image of sunset palace / backdrop */}
-          <img 
-            src="https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=1200&q=80" 
-            alt="historical_backdrop" 
-            className="absolute inset-0 w-full h-[52vh] object-cover opacity-60 z-0" 
+          <img
+            src="https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=1200&q=80"
+            alt="historical_backdrop"
+            className="absolute inset-0 w-full h-[52vh] object-cover opacity-60 z-0"
             onError={(e) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = "https://images.unsplash.com/photo-1506501139174-099022df5260?auto=format&fit=crop&w=1000&q=80";
@@ -1782,35 +1811,6 @@ export default function WeekendMedleyView({
           <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#03060a] to-transparent z-10 pointer-events-none" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/55 to-black/20 z-10 pointer-events-none" />
           <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#03060a] via-[#03060a]/80 to-transparent z-10 pointer-events-none" />
-
-          {/* Floating Actions inside Header Area */}
-          <div className="relative z-20 flex justify-between items-center px-4 pt-5 pb-2">
-            <button 
-              onClick={onBack} 
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/60 border border-white/10 backdrop-blur-md transition-colors"
-              title="返回"
-            >
-              <ChevronLeft size={20} className="text-slate-200" />
-            </button>
-            
-            <div className="flex items-center gap-2 select-none">
-              <button
-                onClick={() => setSimulateNotStarted(prev => !prev)}
-                className={`px-2 py-1.5 rounded-full text-[9px] font-black border transition-all active:scale-95 flex items-center gap-1 shrink-0 shadow-md ${
-                  simulateNotStarted 
-                    ? 'bg-amber-950/50 border-amber-500/40 text-amber-400' 
-                    : 'bg-black/50 border-white/5 text-slate-400 hover:text-slate-200'
-                }`}
-                title="一键切换：模拟活动未开放状态"
-              >
-                <span>{simulateNotStarted ? '已设未开始' : '模拟未开始'}</span>
-              </button>
-
-              <div className="bg-[#12231c]/70 border border-emerald-500/20 px-3 py-1.5 rounded-full text-[10px] font-black text-emerald-400 tracking-wider flex items-center gap-1.5 shadow-[0_4px_12px_rgba(16,185,129,0.15)]">
-                <span>📅 周末限时开放</span>
-              </div>
-            </div>
-          </div>
 
           {/* Hero Content Block */}
           <div className="relative z-20 px-5 pt-12 pb-6 text-left">
@@ -2167,11 +2167,11 @@ export default function WeekendMedleyView({
               </div>
 
               <h3 className="text-base font-black text-white px-2 tracking-wide">🏆 周末城市记忆串烧已完成！</h3>
-              <p className="text-[10px] text-yellow-400/80 font-black mt-1 font-mono tracking-widest uppercase">COMBO RUN COMPLETED SUCCESS</p>
+              <p className="text-[10px] text-yellow-400/80 font-black mt-1 font-mono tracking-widest">串烧跑挑战完成</p>
 
               <div className="my-5 space-y-1.5 text-left bg-black/40 border border-white/5 p-4 rounded-2xl">
                 <p className="text-xs text-slate-200 leading-relaxed font-bold">
-                  恭喜探索家 <strong className="text-yellow-400">木小六</strong>！
+                  恭喜探索家 <strong className="text-yellow-400">沐小六</strong>！
                 </p>
                 <p className="text-[11px] text-slate-300 leading-relaxed font-semibold">
                   您已成功完成本次周末城市记忆串烧。

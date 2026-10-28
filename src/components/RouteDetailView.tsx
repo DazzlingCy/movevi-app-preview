@@ -1,152 +1,160 @@
-import { Play, ChevronRight, MessageSquare } from 'lucide-react';
+import StickyHeroNav from './StickyHeroNav';
+import { useId, useState } from 'react';
+import { Play, ChevronLeft, MessageCircle, MapPin, AlignLeft, X, Lock, UserRound } from 'lucide-react';
 import { getRouteData } from '../data/cities';
+import CityImage from './CityImage';
+import RouteRunners from './RouteRunners';
+import Modal from './journey/Modal';
+import type { CityRouteListItem } from './CityRoutesView';
+import styles from './RouteDetailView.module.css';
 
 interface RouteDetailViewProps {
   cityId: string;
   routeIndex: number;
   image: string;
+  routeOverride?: CityRouteListItem;
+  collectionIntent?: 'review' | 'collect';
   onBack: () => void;
   onStart: () => void;
 }
 
-export default function RouteDetailView({ cityId, routeIndex, image, onBack, onStart }: RouteDetailViewProps) {
-  const routeData = getRouteData(cityId, routeIndex);
+interface RouteComment {
+  text: string;
+  createdAt: string;
+}
+
+function renderCommentEntry(comment: RouteComment, index: number) {
+  return (
+    <article key={index} className={styles.reviewEntry}>
+      <div className={styles.reviewAuthor}>
+        <span className={styles.reviewAvatar}><UserRound size={20} aria-hidden="true" /></span>
+        <div><strong>我</strong><time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('zh-CN', { hour12: false })}</time></div>
+      </div>
+      <p>{comment.text}</p>
+    </article>
+  );
+}
+
+export default function RouteDetailView({ cityId, routeIndex, image, routeOverride, collectionIntent, onBack, onStart }: RouteDetailViewProps) {
+  const routeData = routeOverride ?? getRouteData(cityId, routeIndex);
+  const isLocked = routeOverride?.isUnlocked === false && !routeOverride?.isCompleted;
+  const gradientId = useId();
+  const commentTitleId = useId();
+  const commentInputId = useId();
+  const [showComments, setShowComments] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [comments, setComments] = useState<Record<string, RouteComment[]>>({});
+  const routeKey = cityId + ':' + routeIndex;
+  const draft = drafts[routeKey] ?? '';
+  const routeComments = comments[routeKey] ?? [];
+  const landmarks = routeData.spots.split(/\s*[—→]\s*/).filter(Boolean);
+  const stats = [
+    { value: routeData.distance, label: '预计里程', unit: 'km' },
+    { value: routeData.duration, label: '预计时长', unit: 'min' },
+    { value: routeData.calories, label: '预计消耗', unit: 'kcal' },
+    { value: routeData.rating, label: '路线评分', unit: '分' },
+  ];
 
   return (
-    <div className="w-full h-full bg-[#f4f6f8] text-slate-800 font-sans relative flex flex-col hide-scrollbar">
-      {/* Background Image Header */}
-      <div className="relative w-full h-[45%] shrink-0">
-        <img src={image} alt="Route cover" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-black/30" />
-        
-        {/* Top bar */}
-        <div className="absolute top-0 left-0 right-0 pt-safeb px-4 py-4 z-10 flex items-center text-white">
-          <button 
-            onClick={onBack} 
-            className="w-10 h-10 flex items-center justify-center bg-black/20 backdrop-blur-md rounded-full"
-          >
-            <ChevronRight className="rotate-180" size={24} />
+    <div className={styles.page}>
+      <main className={styles.scrollArea} inert={showComments || undefined}>
+        <StickyHeroNav>
+          <button type="button" onClick={onBack} className={styles.back} aria-label="返回">
+            <ChevronLeft size={22} />
           </button>
-        </div>
+        </StickyHeroNav>
+        <header className={styles.hero}>
+          <CityImage src={routeOverride?.coverImage || image} alt="" fallbackLabel={routeData.title} className={styles.heroImage} loading="eager" fetchPriority="high" />
+          <div className={styles.heroShade} />
+          <div className={styles.heroContent}>
+            <h1>{routeData.title}</h1>
+            <RouteRunners count={routeOverride?.runnerCount} avatars={routeOverride?.runnerAvatars} />
+          </div>
+        </header>
 
-        {/* Info overlay */}
-        <div className="absolute bottom-16 left-6 right-6 text-white drop-shadow-md">
-          <h1 className="text-2xl font-bold mb-3 tracking-wide drop-shadow-lg">路线{routeIndex}：{routeData.title}</h1>
-          <div className="flex items-center text-sm font-medium">
-            <div className="flex -space-x-2 mr-3">
-              {[1, 2, 3].map((i) => (
-                <img 
-                  key={i}
-                  src={`https://i.pravatar.cc/100?img=${i + 10}`} 
-                  alt="avatar" 
-                  className="w-7 h-7 rounded-full border-2 border-white object-cover"
-                />
+        <div className={styles.content}>
+          <section className={styles.summary} aria-label="路线数据">
+            <dl className={styles.stats}>
+              {stats.map((stat, index) => (
+                <div key={stat.label} className={index === 3 ? styles.rating : undefined}>
+                  <dt>{stat.label}</dt>
+                  <dd>{stat.value}<span>{stat.unit}</span></dd>
+                </div>
               ))}
+            </dl>
+            {/* Preserve the original illustrative curve; it is not measured elevation data. */}
+            <div className={styles.chart} aria-hidden="true">
+              <svg viewBox="0 0 400 100" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#74d8b6" stopOpacity="0.24" />
+                    <stop offset="100%" stopColor="#74d8b6" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path d="M 0 80 Q 50 20 100 50 T 200 40 T 300 60 T 400 10 L 400 100 L 0 100 Z" fill={'url(#' + gradientId + ')'} />
+                <path d="M 0 80 Q 50 20 100 50 T 200 40 T 300 60 T 400 10" fill="none" stroke="#74d8b6" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+              </svg>
             </div>
-            <span className="text-slate-100 text-xs drop-shadow">29人跑过</span>
-          </div>
+          </section>
+
+          <section className={styles.section} aria-labelledby="route-spots-title">
+            <h2 id="route-spots-title"><MapPin size={18} aria-hidden="true" />路线景点</h2>
+            <p className={styles.spots}>{landmarks.join(' → ')}</p>
+          </section>
+          <section className={styles.section} aria-labelledby="route-intro-title">
+            <h2 id="route-intro-title"><AlignLeft size={18} aria-hidden="true" />路线简介</h2>
+            <p>{routeData.intro}</p>
+          </section>
+          <section className={styles.section} aria-labelledby="route-reviews-title">
+            <div className={styles.reviewsHeading}>
+              <h2 id="route-reviews-title"><MessageCircle size={18} aria-hidden="true" />路线评论<span className={styles.reviewCount}>{routeComments.length}</span></h2>
+            </div>
+            {routeComments.length ? (
+              <div>
+                {routeComments.map(renderCommentEntry)}
+                <p className={styles.reviewsEnd}>没有更多了</p>
+              </div>
+            ) : <div className={styles.reviewsEmpty}><MessageCircle size={26} aria-hidden="true" /><p>暂无评论，分享你的路线感受吧</p></div>}
+          </section>
         </div>
-      </div>
+      </main>
 
-      {/* Overlapping Content Card */}
-      <div className="flex-1 bg-white -mt-8 rounded-t-[32px] relative z-20 flex flex-col overflow-y-auto pb-32">
-        
-        {/* Stats Row */}
-        <div className="flex justify-between items-center px-8 py-8 border-b border-slate-100">
-          <div className="flex flex-col items-center">
-            <span className="text-2xl font-bold text-slate-900 mb-1">{routeData.distance}</span>
-            <span className="text-[10px] text-slate-500 flex flex-col items-center">
-              <span>预计里程</span>
-              <span>(km)</span>
-            </span>
-          </div>
-          <div className="w-px h-8 bg-slate-200" />
-          <div className="flex flex-col items-center">
-            <span className="text-2xl font-bold text-slate-900 mb-1">{routeData.duration}</span>
-            <span className="text-[10px] text-slate-500 flex flex-col items-center">
-              <span>预计时长</span>
-              <span>(min)</span>
-            </span>
-          </div>
-          <div className="w-px h-8 bg-slate-200" />
-          <div className="flex flex-col items-center">
-            <span className="text-2xl font-bold text-slate-900 mb-1">{routeData.calories}</span>
-            <span className="text-[10px] text-slate-500 flex flex-col items-center">
-              <span>预计消耗</span>
-              <span>(kcal)</span>
-            </span>
-          </div>
-          <div className="w-px h-8 bg-slate-200" />
-          <div className="flex flex-col items-center">
-            <span className="text-2xl font-bold text-orange-500 mb-1">{routeData.rating}</span>
-            <span className="text-[10px] text-slate-500 flex flex-col items-center">
-              <span>路线评分</span>
-              <span>(分)</span>
-            </span>
-          </div>
+      <footer className={styles.actions} inert={showComments || undefined}>
+        <button type="button" className={styles.commentButton} onClick={() => setShowComments(true)} aria-haspopup="dialog">
+          <MessageCircle size={21} aria-hidden="true" /><span>评论</span>
+        </button>
+        <button type="button" disabled={isLocked} onClick={() => { if (!isLocked) onStart(); }} className={styles.startButton} title={isLocked ? '完成前序路线后解锁' : undefined}>
+          {isLocked ? <Lock size={18} aria-hidden="true" /> : <Play size={18} fill="currentColor" aria-hidden="true" />}
+          {isLocked ? '未解锁 · 暂不能开始' : collectionIntent === 'collect' ? '开始收集' : collectionIntent === 'review' ? '再跑一次' : '开始跑步'}
+        </button>
+      </footer>
+
+      {showComments && (
+        <div className={styles.modalLayer}>
+          <Modal labelId={commentTitleId} onClose={() => setShowComments(false)} className={styles.commentSheet}>
+            <div className={styles.commentHeader}>
+              <h2 id={commentTitleId}>路线评论</h2>
+              <button type="button" onClick={() => setShowComments(false)} aria-label="关闭评论"><X size={20} /></button>
+            </div>
+            <p className={styles.commentRoute}>{routeData.title}</p>
+            <div className={styles.commentList} aria-live="polite">
+              {routeComments.length ? routeComments.map(renderCommentEntry) : <div className={styles.empty}><MessageCircle size={28} aria-hidden="true" /><p>暂无评论，分享你的路线感受吧</p></div>}
+            </div>
+            <form onSubmit={event => {
+              event.preventDefault();
+              const text = draft.trim();
+              if (!text) return;
+              const comment = { text, createdAt: new Date().toISOString() };
+              setComments(previous => ({ ...previous, [routeKey]: [...(previous[routeKey] ?? []), comment] }));
+              setDrafts(previous => ({ ...previous, [routeKey]: '' }));
+            }}>
+              <label htmlFor={commentInputId}>写评论</label>
+              <textarea id={commentInputId} tabIndex={0} value={draft} onChange={event => setDrafts(previous => ({ ...previous, [routeKey]: event.target.value }))} maxLength={500} rows={3} placeholder="这条路线给你留下了什么印象？" />
+              <div className={styles.commentSubmit}><span>{draft.length}/500 · 仅本次预览可见</span><button type="submit" disabled={!draft.trim()}>发布（演示）</button></div>
+            </form>
+          </Modal>
         </div>
-
-        {/* Elevation Chart mockup */}
-        <div className="w-full h-24 my-4 px-6 opacity-80">
-          <svg viewBox="0 0 400 100" className="w-full h-full preserve-aspect-ratio-none">
-            <defs>
-              <linearGradient id="elevationGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-              </linearGradient>
-            </defs>
-            <path 
-              d="M 0 80 Q 50 20 100 50 T 200 40 T 300 60 T 400 10 L 400 100 L 0 100 Z" 
-              fill="url(#elevationGrad)" 
-            />
-            <path 
-              d="M 0 80 Q 50 20 100 50 T 200 40 T 300 60 T 400 10" 
-              fill="none" 
-              stroke="#10b981" 
-              strokeWidth="3" 
-            />
-          </svg>
-        </div>
-
-        {/* Content Sections */}
-        <div className="px-6 space-y-8 mt-2">
-          
-          {/* Route spots */}
-          <div>
-             <div className="inline-block bg-gradient-to-r from-emerald-100 to-emerald-50 px-4 py-1.5 rounded-r-full -ml-6 mb-4 border-l-4 border-emerald-500">
-               <span className="text-sm font-bold text-emerald-800">路线景点</span>
-             </div>
-             <p className="text-sm text-slate-600 font-medium leading-relaxed">
-               {routeData.spots}
-             </p>
-          </div>
-
-          {/* Route Intro */}
-          <div>
-             <div className="inline-block bg-gradient-to-r from-emerald-100 to-emerald-50 px-4 py-1.5 rounded-r-full -ml-6 mb-4 border-l-4 border-emerald-500">
-               <span className="text-sm font-bold text-emerald-800">路线简介</span>
-             </div>
-             <p className="text-sm text-slate-500 leading-relaxed">
-               {routeData.intro}
-             </p>
-          </div>
-
-        </div>
-      </div>
-
-      {/* Bottom Action Bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-100 px-6 py-4 pb-8 flex items-center justify-between z-30">
-         <button className="flex items-center text-slate-500 hover:text-slate-800 transition-colors font-medium text-sm gap-2">
-           <MessageSquare size={20} />
-           评价
-         </button>
-         
-         <button onClick={onStart} className="bg-[#2ecc71] hover:bg-[#27ae60] text-white w-48 py-3.5 rounded-full flex items-center justify-center text-lg font-bold shadow-lg shadow-[#2ecc71]/30 transition-transform active:scale-95">
-            <Play className="fill-white mr-2" size={20} />
-            开始
-         </button>
-      </div>
-
+      )}
     </div>
   );
 }

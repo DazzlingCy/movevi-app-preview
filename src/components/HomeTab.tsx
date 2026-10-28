@@ -1,502 +1,47 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { motion, useMotionValue, animate, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Award, Zap, ChevronRight, X, CheckCircle2, Lock, MapPin, Route, Milestone, Activity, Plane, Compass, RefreshCw, ClipboardCheck, Gift, Sparkles, LocateFixed, Footprints, Sun, Cloud, CloudRain, Snowflake, CloudFog, CloudLightning, Wind } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { Award, Zap, ChevronRight, X, CheckCircle2, Lock, Activity, Compass, RefreshCw, Gift, Sparkles, Flame, HeadphonesIcon, Radio } from 'lucide-react';
 import { CITIES, CityData } from '../data/cities';
 import { cn } from '../lib/utils';
 import { getGlowRank } from '../lib/glow';
-import { formatWeatherTemperature, getWeatherStory, usePreviewCityWeather, type WeatherKind, type WeatherState } from '../lib/weather';
-import ActivityQuickLaunch, { type ActivityDrawCounts } from './ActivityQuickLaunch';
+import CityImage from './CityImage';
 
-const MAP_FOCUS_Y_OFFSET = -94;
+const WorldGlobe = React.lazy(() => import('./WorldGlobe'));
 
-function TreadmillIcon({ size = 19, className }: { size?: number; className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M3.5 17.5h11.8c2.6 0 4.2-1.3 5.1-3.8l.45-1.25" />
-      <path d="M6.1 17.5 4.75 21" />
-      <path d="m16.35 17.35 1.6 3.65" />
-      <path d="M15.4 4h4.45v8.45H15.4z" />
-      <path d="M15.4 7.35h-4.15L9 10.65" />
-      <path d="M16.8 6.25h1.65" />
-    </svg>
-  );
-}
+const ENABLE_GLOW_TASKS = false;
 
-function WeatherGlyph({ kind, size = 17, className }: { kind?: WeatherKind; size?: number; className?: string }) {
-  if (kind === 'clear') return <Sun size={size} strokeWidth={1.8} className={className} />;
-  if (kind === 'fog') return <CloudFog size={size} strokeWidth={1.8} className={className} />;
-  if (kind === 'rain') return <CloudRain size={size} strokeWidth={1.8} className={className} />;
-  if (kind === 'snow') return <Snowflake size={size} strokeWidth={1.8} className={className} />;
-  if (kind === 'storm') return <CloudLightning size={size} strokeWidth={1.8} className={className} />;
-  return <Cloud size={size} strokeWidth={1.8} className={className} />;
-}
+const HOME_NEBULA_STARS = Array.from({ length: 38 }, (_, index) => ({
+  id: index,
+  left: `${3 + (index * 29) % 94}%`,
+  top: `${2 + (index * 47) % 92}%`,
+  size: 1 + (index % 3) * 0.65,
+  opacity: 0.2 + (index % 5) * 0.1
+}));
 
-function AnimatedWeatherGlyph({ kind, reduceMotion, size = 20 }: { kind?: WeatherKind; reduceMotion: boolean; size?: number }) {
-  const activeKind = kind || 'cloudy';
-  const animation = {
-    clear: { rotate: [0, 9, 0], scale: [1, 1.08, 1], filter: ['drop-shadow(0 0 4px rgba(255,226,120,0.35))', 'drop-shadow(0 0 11px rgba(255,226,120,0.9))', 'drop-shadow(0 0 4px rgba(255,226,120,0.35))'] },
-    cloudy: { x: [-2, 3, -2], y: [0, -1, 0], opacity: [0.88, 1, 0.88] },
-    fog: { x: [-3, 3, -3], opacity: [0.76, 1, 0.76] },
-    rain: { y: [-1, 3, -1], opacity: [0.86, 1, 0.86] },
-    snow: { rotate: [-8, 8, -8], y: [-1, 2, -1], scale: [0.94, 1.06, 0.94] },
-    storm: { scale: [1, 1.12, 1, 1.08, 1], opacity: [0.84, 1, 0.84, 1, 0.84] }
-  }[activeKind];
-  const duration = activeKind === 'storm' ? 2.2 : activeKind === 'clear' ? 5.5 : 3.6;
+const HOME_NEBULA_METEORS = [
+  { id: 'north', left: '7%', top: '14%', distanceX: 156, distanceY: 92, width: 66, delay: 1.2, duration: 1.35, repeatDelay: 7.4 },
+  { id: 'upper-mid', left: '31%', top: '4%', distanceX: 142, distanceY: 84, width: 58, delay: 3.0, duration: 1.22, repeatDelay: 8.1 },
+  { id: 'east', left: '52%', top: '8%', distanceX: 128, distanceY: 76, width: 52, delay: 4.8, duration: 1.15, repeatDelay: 8.6 },
+  { id: 'south-east', left: '68%', top: '25%', distanceX: 112, distanceY: 68, width: 46, delay: 6.5, duration: 1.08, repeatDelay: 7.8 },
+  { id: 'west', left: '18%', top: '38%', distanceX: 184, distanceY: 108, width: 78, delay: 8.2, duration: 1.55, repeatDelay: 9.2 },
+  { id: 'lower-west', left: '3%', top: '52%', distanceX: 164, distanceY: 96, width: 70, delay: 10.0, duration: 1.42, repeatDelay: 8.8 }
+];
 
-  return (
-    <motion.span
-      aria-hidden="true"
-      className="inline-flex items-center justify-center"
-      animate={reduceMotion ? undefined : animation}
-      transition={reduceMotion ? undefined : { duration, repeat: Infinity, ease: 'easeInOut' }}
-    >
-      <WeatherGlyph kind={activeKind} size={size} />
-    </motion.span>
-  );
-}
+const HOME_STARLIGHT_FLARES = [
+  { id: 'flare-1', left: '18%', top: '18%', size: 9, delay: 0.2 },
+  { id: 'flare-2', left: '72%', top: '15%', size: 7, delay: 1.1 },
+  { id: 'flare-3', left: '84%', top: '39%', size: 10, delay: 1.8 },
+  { id: 'flare-4', left: '29%', top: '52%', size: 6, delay: 2.5 },
+  { id: 'flare-5', left: '61%', top: '62%', size: 8, delay: 3.2 }
+];
 
-function CurrentCityWeatherAura({ kind, reduceMotion }: { kind?: WeatherKind; reduceMotion: boolean }) {
-  return (
-    <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-20 w-20 -translate-x-1/2 -translate-y-1/2">
-      <motion.span
-        className="absolute inset-[7px] rounded-full bg-[radial-gradient(circle,rgba(255,221,119,0.2)_0%,rgba(255,214,102,0.08)_42%,transparent_72%)]"
-        animate={reduceMotion ? undefined : { scale: [0.92, 1.08, 0.92], opacity: [0.62, 1, 0.62] }}
-        transition={reduceMotion ? undefined : { duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-      />
-
-      {kind === 'clear' && (
-        <>
-          <motion.span
-            className="absolute left-[13px] top-[13px] h-[54px] w-[54px] rounded-full border border-amber-100/25"
-            animate={reduceMotion ? undefined : { scale: [0.94, 1.08, 0.94], opacity: [0.35, 0.72, 0.35] }}
-            transition={reduceMotion ? undefined : { duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          {[{ left: 11, top: 29 }, { left: 59, top: 21 }, { left: 54, top: 60 }].map((point, index) => (
-            <motion.span
-              key={`${point.left}-${point.top}`}
-              className="absolute h-1.5 w-1.5 rounded-full bg-amber-100 shadow-[0_0_8px_rgba(255,229,151,0.9)]"
-              style={{ left: point.left, top: point.top }}
-              animate={reduceMotion ? undefined : { opacity: [0.25, 1, 0.25], scale: [0.75, 1.2, 0.75] }}
-              transition={reduceMotion ? undefined : { duration: 2.1, repeat: Infinity, delay: index * 0.38, ease: 'easeInOut' }}
-            />
-          ))}
-        </>
-      )}
-
-      {kind === 'cloudy' && (
-        <>
-          <motion.span
-            className="absolute left-2 top-[18px] h-4 w-10 rounded-full bg-slate-200/20 blur-[1px]"
-            animate={reduceMotion ? undefined : { x: [-4, 6, -4], opacity: [0.35, 0.72, 0.35] }}
-            transition={reduceMotion ? undefined : { duration: 4.4, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.span
-            className="absolute bottom-[15px] right-1 h-3.5 w-9 rounded-full bg-cyan-100/16 blur-[1px]"
-            animate={reduceMotion ? undefined : { x: [5, -5, 5], opacity: [0.28, 0.58, 0.28] }}
-            transition={reduceMotion ? undefined : { duration: 5.2, repeat: Infinity, ease: 'easeInOut' }}
-          />
-        </>
-      )}
-
-      {kind === 'rain' && [18, 29, 40, 51, 61].map((left, index) => (
-        <motion.span
-          key={left}
-          className="absolute top-[18px] h-3 w-px rounded-full bg-cyan-100/75 shadow-[0_0_5px_rgba(144,225,255,0.7)]"
-          style={{ left }}
-          animate={reduceMotion ? undefined : { y: [-5, 28], opacity: [0, 0.85, 0] }}
-          transition={reduceMotion ? undefined : { duration: 1.25, repeat: Infinity, delay: index * 0.16, ease: 'linear' }}
-        />
-      ))}
-
-      {kind === 'snow' && [{ left: 15, top: 15 }, { left: 29, top: 9 }, { left: 43, top: 18 }, { left: 57, top: 11 }, { left: 65, top: 27 }].map((point, index) => (
-        <motion.span
-          key={`${point.left}-${point.top}`}
-          className="absolute h-1.5 w-1.5 rounded-full bg-white/90 shadow-[0_0_7px_rgba(214,244,255,0.85)]"
-          style={{ left: point.left, top: point.top }}
-          animate={reduceMotion ? undefined : { x: [0, index % 2 === 0 ? 5 : -5, 0], y: [0, 34], opacity: [0.2, 1, 0] }}
-          transition={reduceMotion ? undefined : { duration: 2.8, repeat: Infinity, delay: index * 0.3, ease: 'linear' }}
-        />
-      ))}
-
-      {kind === 'fog' && [22, 34, 46].map((top, index) => (
-        <motion.span
-          key={top}
-          className="absolute left-2 h-1.5 w-16 rounded-full bg-slate-100/20 blur-[2px]"
-          style={{ top }}
-          animate={reduceMotion ? undefined : { x: index % 2 === 0 ? [-5, 5, -5] : [5, -5, 5], opacity: [0.24, 0.58, 0.24] }}
-          transition={reduceMotion ? undefined : { duration: 4 + index * 0.6, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      ))}
-
-      {kind === 'storm' && (
-        <>
-          <motion.span
-            className="absolute left-2 top-[18px] h-4 w-16 rounded-full bg-slate-200/18 blur-[2px]"
-            animate={reduceMotion ? undefined : { opacity: [0.22, 0.52, 0.22] }}
-            transition={reduceMotion ? undefined : { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.span
-            className="absolute inset-[10px] rounded-full bg-white/25 blur-[5px]"
-            animate={reduceMotion ? undefined : { opacity: [0, 0, 0.58, 0, 0] }}
-            transition={reduceMotion ? undefined : { duration: 4.6, repeat: Infinity, times: [0, 0.55, 0.58, 0.62, 1] }}
-          />
-          {[24, 40, 56].map((left, index) => (
-            <motion.span
-              key={left}
-              className="absolute top-[26px] h-3 w-px bg-cyan-100/70"
-              style={{ left }}
-              animate={reduceMotion ? undefined : { y: [-3, 24], opacity: [0, 0.75, 0] }}
-              transition={reduceMotion ? undefined : { duration: 1.1, repeat: Infinity, delay: index * 0.22, ease: 'linear' }}
-            />
-          ))}
-        </>
-      )}
-    </span>
-  );
-}
-
-function LocalWorldMap() {
-  const landClass = "fill-slate-200/55 stroke-cyan-100/30";
-  const glowClass = "fill-cyan-200/12";
-
-  return (
-    <svg
-      viewBox="0 0 1200 800"
-      className="absolute inset-0 h-full w-full pointer-events-none"
-      aria-hidden="true"
-    >
-      <defs>
-        <filter id="world-map-glow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="5" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      <g filter="url(#world-map-glow)">
-        <path className={glowClass} d="M95 170L160 112L255 105L330 145L365 218L325 300L245 338L160 315L92 250Z" />
-        <path className={glowClass} d="M355 350L430 385L455 490L425 640L360 705L320 618L305 500Z" />
-        <path className={glowClass} d="M500 190L610 150L705 185L735 265L650 315L545 285Z" />
-        <path className={glowClass} d="M610 315L700 335L742 455L705 612L610 600L560 485Z" />
-        <path className={glowClass} d="M675 185L850 125L1065 170L1120 280L1010 380L820 355L705 285Z" />
-        <path className={glowClass} d="M930 520L1045 545L1100 625L1030 680L920 640Z" />
-      </g>
-      <g strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round">
-        <path className={landClass} d="M88 178L143 120L230 95L307 118L358 166L382 230L345 282L290 315L215 330L145 306L86 255L60 205Z" />
-        <path className={landClass} d="M245 96L282 70L345 82L386 116L350 150L298 132Z" />
-        <path className={landClass} d="M366 332L430 365L470 435L452 548L410 655L350 710L318 620L300 520L323 420Z" />
-        <path className={landClass} d="M498 204L548 163L632 152L700 190L715 248L654 296L565 285L510 250Z" />
-        <path className={landClass} d="M610 306L690 328L742 410L735 520L694 624L625 604L575 520L550 430Z" />
-        <path className={landClass} d="M680 184L790 128L930 118L1062 160L1134 230L1110 320L1018 386L875 374L750 325L705 252Z" />
-        <path className={landClass} d="M780 330L830 358L812 410L750 390Z" />
-        <path className={landClass} d="M915 516L1025 538L1102 605L1074 665L980 684L910 638Z" />
-        <path className={landClass} d="M642 612L678 638L650 680L610 650Z" />
-        <path className={landClass} d="M530 165L548 132L585 142L570 178Z" />
-      </g>
-    </svg>
-  );
-}
-
-type MapCityNodeProps = {
-  key?: React.Key;
-  city: CityData;
-  isCurrent: boolean;
-  isLit: boolean;
-  reduceMotion: boolean;
-  weather?: WeatherState;
-  onSelect: (city: CityData) => void;
+const getCityPreviewImage = (city?: CityData | null) => {
+  if (!city) return '';
+  return city.image;
 };
 
-function MapCityNode({
-  city,
-  isCurrent,
-  isLit,
-  reduceMotion,
-  weather,
-  onSelect
-}: MapCityNodeProps) {
-  const isUpcoming = city.status === 'upcoming';
-  const labelPositionClass = city.labelPosition === 'top'
-    ? 'bottom-9 left-1/2 -translate-x-1/2'
-    : city.labelPosition === 'bottom'
-      ? 'top-9 left-1/2 -translate-x-1/2'
-      : city.labelPosition === 'left'
-        ? 'right-9 top-1/2 -translate-y-1/2'
-        : 'left-9 top-1/2 -translate-y-1/2';
-  const verticalCardAlignment = city.x > 70
-    ? 'right-0'
-    : city.x < 30
-      ? 'left-0'
-      : 'left-1/2 -translate-x-1/2';
-  const currentLabelPositionClass = city.labelPosition === 'top'
-    ? `bottom-12 ${verticalCardAlignment}`
-    : city.labelPosition === 'bottom'
-      ? `top-12 ${verticalCardAlignment}`
-      : city.labelPosition === 'left'
-        ? 'right-12 top-1/2 -translate-y-1/2'
-        : 'left-12 top-1/2 -translate-y-1/2';
-  const progressLabel = `${city.completed}/${city.routes} 路线`;
-  const progressDegrees = Math.max(0, Math.min(360, (city.completed / Math.max(1, city.routes)) * 360));
-  const weatherStory = getWeatherStory(city.name, weather?.data || null);
-  const ariaLabel = isCurrent
-    ? `${city.name}，正在进行中，已完成 ${progressLabel}${weather?.data ? `，当前${weather.data.label}，${formatWeatherTemperature(weather.data.temperature)}` : ''}`
-    : isLit
-      ? `${city.name}，已点亮城市`
-      : isUpcoming
-        ? `${city.name}，未上线`
-        : `${city.name}，未点亮城市`;
-
-  return (
-    <motion.button
-      type="button"
-      aria-label={ariaLabel}
-      className={cn(
-        'absolute isolate flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--accent)]',
-        isCurrent ? 'z-30' : 'z-20'
-      )}
-      style={{ left: `${city.x}%`, top: `${city.y}%` }}
-      whileHover={reduceMotion ? undefined : { scale: 1.06, zIndex: 50 }}
-      whileTap={reduceMotion ? undefined : { scale: 0.94 }}
-      onClick={(event) => {
-        event.stopPropagation();
-        onSelect(city);
-      }}
-    >
-      {isCurrent && (
-        <>
-          <CurrentCityWeatherAura kind={weather?.data?.kind} reduceMotion={reduceMotion} />
-          <motion.span
-            aria-hidden="true"
-            className="absolute z-[1] h-[46px] w-[46px] rounded-full border border-amber-100/16 bg-amber-100/[0.035] shadow-[0_0_30px_rgba(255,214,102,0.2)]"
-            animate={reduceMotion ? undefined : { scale: [0.96, 1.05, 0.96], opacity: [0.64, 0.96, 0.64] }}
-            transition={reduceMotion ? undefined : { duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-          />
-        </>
-      )}
-
-      {!isCurrent && isLit && (
-        <span aria-hidden="true" className="absolute h-[22px] w-[22px] rounded-full border border-[#d8f9ff]/90 bg-[#64d2ff]/30 shadow-[0_0_18px_rgba(100,210,255,0.72),inset_0_0_8px_rgba(216,249,255,0.22)]" />
-      )}
-
-      {isCurrent && (
-        <span
-          aria-hidden="true"
-          className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full p-[2px] shadow-[0_0_24px_rgba(255,214,102,0.72)]"
-          style={{ background: `conic-gradient(#ffe278 ${progressDegrees}deg, rgba(255,226,120,0.16) ${progressDegrees}deg 360deg)` }}
-        >
-          <span className="flex h-full w-full items-center justify-center rounded-full border border-[#fff0aa]/35 bg-[#17140c] shadow-[inset_0_0_12px_rgba(255,214,102,0.2)]">
-            <span className="h-4 w-4 rounded-full border-2 border-white bg-[#ffe278] shadow-[0_0_10px_rgba(255,255,255,0.92),0_0_26px_rgba(255,214,102,1)]" />
-          </span>
-        </span>
-      )}
-
-      {!isCurrent && isLit && (
-        <span aria-hidden="true" className="relative z-10 flex h-4 w-4 items-center justify-center">
-          <span className="h-2.5 w-2.5 rounded-full border border-white bg-[#c8f7ff] shadow-[0_0_6px_rgba(255,255,255,0.95),0_0_18px_rgba(100,210,255,1)]" />
-        </span>
-      )}
-
-      {!isCurrent && !isLit && !isUpcoming && (
-        <span aria-hidden="true" className="relative z-10 h-3.5 w-3.5 rounded-full border-2 border-[#f2f7f8] bg-[#91a5ac] shadow-[0_0_16px_rgba(210,224,229,0.58)]" />
-      )}
-
-      {isUpcoming && (
-        <span aria-hidden="true" className="relative z-10 flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-white/35 bg-white/10 text-white/55 shadow-[0_0_10px_rgba(255,255,255,0.12)]">
-          <Lock size={9} strokeWidth={1.8} />
-        </span>
-      )}
-
-      {isCurrent && (
-        <motion.span
-          aria-hidden="true"
-          initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: reduceMotion ? 0 : 0.38, ease: 'easeOut' }}
-          className={cn(
-            'pointer-events-auto absolute z-30 w-[172px] rounded-[19px] border border-amber-100/25 bg-[linear-gradient(145deg,rgba(31,27,16,0.97),rgba(9,14,17,0.94))] px-3 py-2.5 text-left shadow-[0_14px_34px_rgba(0,0,0,0.42),0_0_28px_rgba(255,214,102,0.13),inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl',
-            currentLabelPositionClass
-          )}
-        >
-          <span className="flex items-center justify-between gap-2">
-            <span className="text-[8px] font-semibold tracking-[0.13em] text-amber-100/88">当前城市 · {city.name}</span>
-            <span className="font-mono text-[8px] text-white/62">{progressLabel}</span>
-          </span>
-          <span className="mt-1.5 flex items-center gap-2">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] border border-amber-100/30 bg-amber-100/[0.14] text-amber-50 shadow-[0_0_20px_rgba(255,214,102,0.28)]">
-              <AnimatedWeatherGlyph kind={weather?.data?.kind} reduceMotion={reduceMotion} size={18} />
-            </span>
-            <span className="min-w-0">
-              <span className="block font-mono text-[13px] font-semibold tracking-[-0.02em] text-white">
-                {weather?.data ? `${formatWeatherTemperature(weather.data.temperature)} · ${weather.data.label}` : '天气生成中'}
-              </span>
-              <span className="mt-0.5 block line-clamp-2 text-[8px] font-medium leading-[1.45] text-white/68">{weatherStory.short}</span>
-            </span>
-          </span>
-        </motion.span>
-      )}
-
-      {!isCurrent && !isUpcoming && (
-        <span className={cn(
-          'pointer-events-none absolute z-30 flex items-center gap-1 whitespace-nowrap rounded-[10px] border px-2 py-1 text-[9px] font-medium backdrop-blur-lg',
-          isLit
-            ? 'border-[var(--accent)]/15 bg-[#091418]/88 text-[#a9eaff]'
-            : 'border-white/[0.16] bg-[#0b1114]/88 text-white/78',
-          labelPositionClass
-        )}>
-          {isLit ? <span className="h-1.5 w-1.5 rounded-full border border-white bg-[#8cecff] shadow-[0_0_8px_rgba(100,210,255,0.9)]" /> : <span className="h-1.5 w-1.5 rounded-full border border-[#e6f0f2] bg-[#7a8e96] shadow-[0_0_6px_rgba(210,224,229,0.45)]" />}
-          {city.name}
-        </span>
-      )}
-
-      {isUpcoming && (
-        <span className={cn('pointer-events-none absolute z-30 flex items-center gap-1 whitespace-nowrap rounded-full border border-dashed border-white/[0.16] bg-black/68 px-2 py-1 text-[8px] font-medium text-white/60', labelPositionClass)}>
-          <Lock size={9} strokeWidth={1.8} />
-          未上线
-        </span>
-      )}
-    </motion.button>
-  );
-}
-
-type CityDiscoverySheetProps = {
-  city: CityData;
-  isCurrent: boolean;
-  reduceMotion: boolean;
-  weather?: WeatherState;
-  onClose: () => void;
-  onAction: (city: CityData) => void;
-};
-
-function CityDiscoverySheet({ city, isCurrent, reduceMotion, weather, onClose, onAction }: CityDiscoverySheetProps) {
-  const isUpcoming = city.status === 'upcoming';
-  const isLit = city.status === 'lit';
-  const completion = city.status === 'lit' ? 100 : Math.round((city.completed / city.routes) * 100);
-  const actionLabel = isCurrent ? '继续路线' : isLit ? '探索这座城市' : '查看城市';
-  const titleId = `city-discovery-${city.id}`;
-  const weatherStory = getWeatherStory(city.name, weather?.data || null);
-
-  return (
-    <motion.div
-      role="presentation"
-      initial={reduceMotion ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="absolute inset-0 z-40 flex items-end bg-black/35 p-4 backdrop-blur-[2px]"
-      onClick={onClose}
-    >
-      <motion.section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        initial={reduceMotion ? false : { opacity: 0, y: 28, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 20, scale: 0.99 }}
-        transition={{ duration: reduceMotion ? 0 : 0.24, ease: 'easeOut' }}
-        className="premium-material-strong relative w-full overflow-hidden rounded-[30px] p-4"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start gap-3.5">
-          <div className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-[22px] border border-white/[0.09] bg-white/[0.04]">
-            <img src={city.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-          </div>
-
-          <div className="min-w-0 flex-1 pt-1">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className={cn('text-[9px] font-semibold tracking-[0.12em]', isCurrent ? 'text-amber-200/65' : isLit ? 'text-[var(--accent)]/70' : 'text-white/35')}>
-                  {isCurrent ? '正在进行中' : isLit ? '已点亮城市' : isUpcoming ? '城市未上线' : '未点亮城市'}
-                </p>
-                <h2 id={titleId} className="mt-1 truncate text-[21px] font-semibold tracking-[-0.025em] text-white">{city.name}</h2>
-                <p className="mt-0.5 text-[10px] font-medium text-white/35">{city.englishName} · {city.continent}</p>
-              </div>
-              <button
-                type="button"
-                autoFocus
-                aria-label="关闭城市探索卡"
-                onClick={onClose}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.05] text-white/50 transition-colors hover:bg-white/[0.09] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-              >
-                <X size={17} strokeWidth={1.8} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {isCurrent && (
-          <div className="mt-3 flex gap-3 rounded-[20px] border border-amber-100/12 bg-[linear-gradient(135deg,rgba(255,224,132,0.08),rgba(100,210,255,0.035))] p-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] border border-amber-100/15 bg-amber-100/[0.07] text-amber-100">
-              <AnimatedWeatherGlyph kind={weather?.data?.kind} reduceMotion={reduceMotion} size={18} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <p className="text-[11px] font-semibold text-white/88">
-                  {weather?.data
-                    ? `${formatWeatherTemperature(weather.data.temperature)} · ${weather.data.label}`
-                    : '天气氛围生成中'}
-                </p>
-                {weather?.data && (
-                  <span className="flex items-center gap-1 font-mono text-[8px] text-white/55">
-                    <Wind size={10} strokeWidth={1.8} />
-                    {Math.round(weather.data.windSpeed)} km/h · 体感 {formatWeatherTemperature(weather.data.apparentTemperature)}
-                  </span>
-                )}
-              </div>
-              <p className="mt-1.5 line-clamp-2 text-[10px] font-medium leading-[1.55] text-white/65">{weatherStory.full}</p>
-            </div>
-          </div>
-        )}
-
-        <p className="mt-3 line-clamp-2 text-[11px] leading-[1.65] text-white/62">{city.description}</p>
-
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {[
-            { label: '路线', value: city.routes },
-            { label: '记忆点', value: city.spots },
-            { label: '完成度', value: `${completion}%` }
-          ].map((item) => (
-            <div key={item.label} className="rounded-[16px] border border-white/[0.065] bg-white/[0.035] px-3 py-2.5">
-              <p className="text-[9px] font-medium text-white/50">{item.label}</p>
-              <p className="mt-1 font-mono text-[13px] font-semibold text-white/92">{item.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {isUpcoming ? (
-          <div className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-white/[0.065] bg-white/[0.035] text-[11px] font-medium text-white/35">
-            <Lock size={14} strokeWidth={1.8} />
-            该城市暂未上线
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onAction(city)}
-            className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] bg-[var(--accent)] px-4 text-[12px] font-semibold text-[#061116] transition-colors hover:bg-[#93e3ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          >
-            <Footprints size={16} strokeWidth={2} />
-            {actionLabel}
-          </button>
-        )}
-      </motion.section>
-    </motion.div>
-  );
-}
-
-export default function HomeTab({ onNavigate, completedChapters = [], targetFlight, sessionCompletedFlights = [], onFlightComplete, pendingSelectionFrom, onCitySelected, litCityIds = [], userStats, setUserStats, taskPanelOpenSignal = 0, onSelectMedley, onSelectMedalLottery, onSelectWeightLossPlan, onSelectHundredCities, activityDrawCounts }: { onNavigate?: (type: string, data: any) => void; completedChapters?: number[]; targetFlight?: {fromCityId: string, toCityId: string} | null; sessionCompletedFlights?: Array<{fromCityId: string; toCityId: string}>; onFlightComplete?: () => void; pendingSelectionFrom?: string | null; onCitySelected?: (cityId: string) => void; litCityIds?: string[]; userStats?: any; setUserStats?: any; taskPanelOpenSignal?: number; onSelectMedley?: () => void; onSelectMedalLottery?: () => void; onSelectWeightLossPlan?: () => void; onSelectHundredCities?: () => void; activityDrawCounts?: ActivityDrawCounts; }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+export default function HomeTab({ onNavigate, completedChapters = [], targetFlight, onFlightComplete, pendingSelectionFrom, onCitySelected, litCityIds = [], userStats, setUserStats, taskPanelOpenSignal = 0, onTreadmillActivated }: { onNavigate?: (type: string, data: any) => void; completedChapters?: number[]; targetFlight?: {fromCityId: string, toCityId: string} | null; onFlightComplete?: () => void; pendingSelectionFrom?: string | null; onCitySelected?: (cityId: string) => void; litCityIds?: string[]; userStats?: any; setUserStats?: any; taskPanelOpenSignal?: number; onTreadmillActivated?: () => void; }) {
+  const reduceMotion = useReducedMotion();
   const [showStoryPanel, setShowStoryPanel] = useState(false);
   const [showCitySelection, setShowCitySelection] = useState(false);
   const [selectableCities, setSelectableCities] = useState<CityData[]>([]);
@@ -505,19 +50,33 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showSwitchConfirm, setShowSwitchConfirm] = useState(false);
   const [showTaskPanel, setShowTaskPanel] = useState(false);
+  const [globeReady, setGlobeReady] = useState(false);
   const [rewardBurst, setRewardBurst] = useState<{ id: number; reward: number; title: string } | null>(null);
-  const [showMapHint, setShowMapHint] = useState(true);
-  const reduceMotion = !!useReducedMotion();
-  const currentGlowRank = getGlowRank(userStats?.lifetimeLightValue ?? userStats?.lightValue ?? 0).current;
+  const [broadcastIndex, setBroadcastIndex] = useState(0);
+  const glowRankDetails = getGlowRank(userStats?.lifetimeLightValue ?? userStats?.lightValue ?? 0);
+  const currentGlowRank = glowRankDetails.current;
+  const citySwitchPasses = userStats?.citySwitchPasses || 0;
+  const equippedHomeThemes: string[] = userStats?.equippedGlowShopItemIds || [];
+  const auroraEarthActive = equippedHomeThemes.includes('home-globe-aurora');
+  const nightEarthActive = equippedHomeThemes.includes('home-globe-night');
+  const nebulaSpaceActive = equippedHomeThemes.includes('home-space-nebula');
+  const starlightSpaceActive = equippedHomeThemes.includes('home-space-starlight');
+  const globeAppearance = nightEarthActive ? 'night' : auroraEarthActive ? 'aurora' : 'default';
+  const spaceBackground = nebulaSpaceActive ? 'nebula' : starlightSpaceActive ? 'starlight' : 'default';
   const avatarFrameStyles: Record<number, { ring: string; shadow: string; badge: string }> = {
-    1: { ring: 'from-orange-200 via-amber-500 to-stone-700', shadow: 'shadow-[0_8px_22px_rgba(251,146,60,0.16)]', badge: 'text-orange-200' },
-    2: { ring: 'from-white via-slate-300 to-slate-600', shadow: 'shadow-[0_8px_22px_rgba(226,232,240,0.14)]', badge: 'text-slate-100' },
-    3: { ring: 'from-[#fff3bd] via-[#d6ad55] to-[#574018]', shadow: 'shadow-[0_8px_22px_rgba(251,191,36,0.18)]', badge: 'text-amber-200' },
-    4: { ring: 'from-cyan-100 via-sky-300 to-blue-700', shadow: 'shadow-[0_8px_22px_rgba(100,210,255,0.16)]', badge: 'text-cyan-200' },
-    5: { ring: 'from-fuchsia-100 via-violet-300 to-indigo-700', shadow: 'shadow-[0_8px_22px_rgba(167,139,250,0.17)]', badge: 'text-fuchsia-200' },
-    6: { ring: 'from-rose-100 via-amber-200 to-yellow-500', shadow: 'shadow-[0_8px_22px_rgba(251,113,133,0.17)]', badge: 'text-rose-100' }
+    1: { ring: 'from-orange-300 via-amber-500 to-stone-700', shadow: 'shadow-[0_0_16px_rgba(251,146,60,0.42)]', badge: 'text-orange-200' },
+    2: { ring: 'from-white via-slate-300 to-slate-500', shadow: 'shadow-[0_0_16px_rgba(226,232,240,0.38)]', badge: 'text-slate-100' },
+    3: { ring: 'from-amber-100 via-yellow-300 to-amber-600', shadow: 'shadow-[0_0_18px_rgba(251,191,36,0.5)]', badge: 'text-amber-200' },
+    4: { ring: 'from-cyan-100 via-sky-300 to-blue-600', shadow: 'shadow-[0_0_20px_rgba(34,211,238,0.5)]', badge: 'text-cyan-200' },
+    5: { ring: 'from-fuchsia-100 via-violet-300 to-indigo-600', shadow: 'shadow-[0_0_20px_rgba(217,70,239,0.48)]', badge: 'text-fuchsia-200' },
+    6: { ring: 'from-rose-100 via-amber-200 to-yellow-500', shadow: 'shadow-[0_0_22px_rgba(251,113,133,0.5)]', badge: 'text-rose-100' }
   };
   const avatarFrame = avatarFrameStyles[currentGlowRank.level] || avatarFrameStyles[1];
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setGlobeReady(true), 250);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (userStats?.dailyTreadmillStarted) {
@@ -535,56 +94,68 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
   }, [pendingSelectionFrom]);
 
   useEffect(() => {
-    if (taskPanelOpenSignal > 0) {
+    if (ENABLE_GLOW_TASKS && taskPanelOpenSignal > 0) {
       setShowTaskPanel(true);
     }
   }, [taskPanelOpenSignal]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setShowMapHint(false), 4200);
-    return () => window.clearTimeout(timer);
-  }, []);
-
   const litCount = CITIES.filter(c => c.status === 'lit').length;
   const inProgressCity = CITIES.find(c => c.status === 'in-progress');
-  const currentCityWeather = usePreviewCityWeather(inProgressCity);
-  const sessionJourneySegments = useMemo(() => (
-    sessionCompletedFlights.flatMap((flight) => {
-      const fromCity = CITIES.find(city => city.id === flight.fromCityId);
-      const toCity = CITIES.find(city => city.id === flight.toCityId);
-      return fromCity && toCity ? [{ fromCity, toCity }] : [];
-    })
-  ), [sessionCompletedFlights]);
-
+  const nextFocusCity = inProgressCity || CITIES.find(c => c.status !== 'lit' && c.status !== 'upcoming') || CITIES.find(c => c.status !== 'upcoming');
+  const availableCityCount = CITIES.filter(c => c.status !== 'upcoming').length;
+  
   const numMap = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
 
+  let currentChapterText = "奔跑·点亮地球计划尚未开启";
   let progressWidth = '0%';
-  let journeyPromptText = '选择第一座城市，开始唤醒地球记忆';
+
+  const medalLotteryHistory = userStats?.medalLotteryDrawHistory || [];
+  const broadcastMessages = [
+    ...medalLotteryHistory.slice(0, 3).map((record: any) => ({
+      type: 'prize' as const,
+      text: `${record.nickname || '沐小六'} 在勋章抽奖中抽中 ${record.amount} 现金红包`
+    })),
+    { type: 'route' as const, text: '林同风完成 北京·故宫角楼掠影，获得城市勋章' },
+    { type: 'prize' as const, text: '晨跑星在勋章抽奖中抽中 1.66 元现金红包' },
+    { type: 'route' as const, text: '青柠完成 新加坡·滨海湾路线，点亮路线勋章' },
+    { type: 'prize' as const, text: '夜航员在勋章抽奖中抽中 2.66 元现金红包' },
+    { type: 'route' as const, text: '北岸完成 杭州·西湖断桥残雪，获得城市勋章' }
+  ];
+  const activeBroadcast = broadcastMessages[broadcastIndex % broadcastMessages.length];
+
+  useEffect(() => {
+    if (broadcastMessages.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setBroadcastIndex(prev => (prev + 1) % broadcastMessages.length);
+    }, 2800);
+    return () => window.clearInterval(timer);
+  }, [broadcastMessages.length]);
   
   if (litCityIds.length === 0) {
+    currentChapterText = "未知状态：点击进入并开启计划";
     progressWidth = '0%';
   } else if (inProgressCity) {
+    const cityIndexInSequence = litCityIds.indexOf(inProgressCity.id);
+    const numStr = numMap[cityIndexInSequence] || (cityIndexInSequence + 1).toString();
+    currentChapterText = `第${numStr}城：${inProgressCity.name}，${inProgressCity.description}`;
     progressWidth = `${(inProgressCity.completed / inProgressCity.routes) * 100}%`;
-    const remainingRoutes = Math.max(0, inProgressCity.routes - inProgressCity.completed);
-    journeyPromptText = remainingRoutes > 0
-      ? `再完成 ${remainingRoutes} 条路线，点亮${inProgressCity.name}`
-      : `${inProgressCity.name}已完成，选择下一站`;
   } else if (litCount > 0 && litCount === CITIES.length) {
+    currentChapterText = "所有城市已点亮（地球倒影已解锁）";
     progressWidth = '100%';
-    journeyPromptText = '地球记忆已全部点亮';
   } else {
      // If everything is lit but some are still in progress? 
      // Or if we just finished one and haven't picked next
      const lastLitId = litCityIds[litCityIds.length - 1];
      const lastLitCity = CITIES.find(c => c.id === lastLitId);
       if (lastLitCity) {
+        currentChapterText = `已点亮：${lastLitCity.name}，请开启下一站`;
         progressWidth = '100%';
-        journeyPromptText = `从${lastLitCity.name}出发，选择下一座城市`;
       }
   }
 
   const handleConnectTreadmill = () => {
     setIsTreadmillConnected(true);
+    onTreadmillActivated?.();
     if (setUserStats) {
       setUserStats((prev: any) => ({
         ...prev,
@@ -646,8 +217,6 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
     const order = ['daily-checkin', 'daily-treadmill', 'daily-route'];
     return order.indexOf(a.id) - order.indexOf(b.id);
   });
-  const claimableDailyTasks = orderedDailyTasks.filter(task => task.ready && !task.claimed);
-  const hasClaimableDailyReward = claimableDailyTasks.length > 0;
   const weeklyTasks = [
     {
       id: 'weekly-city',
@@ -703,107 +272,6 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
     showToast(`获得 ${reward} 点光迹值`);
   };
 
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-
-  useEffect(() => {
-    if (targetFlight) {
-        const fromCity = CITIES.find(c => c.id === targetFlight.fromCityId);
-        const toCity = CITIES.find(c => c.id === targetFlight.toCityId);
-        if (fromCity && toCity) {
-            const mapWidth = 1200;
-            const mapHeight = 800;
-            const startOffsetX = (0.5 - fromCity.x / 100) * mapWidth;
-            const startOffsetY = (0.5 - fromCity.y / 100) * mapHeight + MAP_FOCUS_Y_OFFSET;
-            const endOffsetX = (0.5 - toCity.x / 100) * mapWidth;
-            const endOffsetY = (0.5 - toCity.y / 100) * mapHeight + MAP_FOCUS_Y_OFFSET;
-
-             x.set(startOffsetX);
-             y.set(startOffsetY);
-             setScale(1.2);
-
-             if (reduceMotion) {
-               x.set(endOffsetX);
-               y.set(endOffsetY);
-               setSelectedCity(toCity);
-               onFlightComplete?.();
-               return;
-             }
-
-             setTimeout(() => {
-               animate(x, endOffsetX, { type: 'spring', bounce: 0, duration: 3 });
-               animate(y, endOffsetY, { type: 'spring', bounce: 0, duration: 3 });
-             }, 500);
-
-            setTimeout(() => {
-                setSelectedCity(toCity);
-                if (onFlightComplete) {
-                    onFlightComplete();
-                }
-            }, 3600);
-        }
-        return;
-    }
-
-    // Focus on the in-progress city on initial load if no target flight
-    const inProgressCity = CITIES.find(c => c.status === 'in-progress') || CITIES[0];
-
-    const mapWidth = 1200;
-    const mapHeight = 800;
-    const offsetX = (0.5 - inProgressCity.x / 100) * mapWidth;
-    const offsetY = (0.5 - inProgressCity.y / 100) * mapHeight + MAP_FOCUS_Y_OFFSET;
-    
-    if (reduceMotion) {
-      x.set(offsetX);
-      y.set(offsetY);
-    } else {
-      animate(x, offsetX, { duration: 0.6, ease: 'easeOut' });
-      animate(y, offsetY, { duration: 0.6, ease: 'easeOut' });
-    }
-    setScale(1.08);
-  }, [x, y, targetFlight, onFlightComplete, reduceMotion]);
-
-  const handleZoomIn = () => setScale(prev => Math.min(prev + 0.5, 3));
-  const handleZoomOut = () => setScale(prev => Math.max(prev - 0.5, 0.5));
-
-  const touchDistance = useRef<number | null>(null);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setShowMapHint(false);
-    if (e.touches.length === 2) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      touchDistance.current = dist;
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && touchDistance.current !== null) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      const delta = dist - touchDistance.current;
-      setScale(prev => Math.min(Math.max(prev + delta * 0.01, 0.5), 3));
-      touchDistance.current = dist;
-    }
-  };
-
-  const handleTouchEnd = () => {
-    touchDistance.current = null;
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    setShowMapHint(false);
-    if (e.deltaY < 0) {
-      setScale(prev => Math.min(prev + 0.1, 3));
-    } else {
-      setScale(prev => Math.max(prev - 0.1, 0.5));
-    }
-  };
-
   const handleStartExplore = () => {
     setShowStoryPanel(false);
     
@@ -850,376 +318,502 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
     }
     
     if (!pendingSelectionFrom) {
-      // Default map is 1200x800
-      const mapWidth = 1200;
-      const mapHeight = 800;
-      
-      // Find offset
-      const offsetX = (0.5 - city.x / 100) * mapWidth;
-      const offsetY = (0.5 - city.y / 100) * mapHeight + MAP_FOCUS_Y_OFFSET;
-      
-      animate(x, offsetX, { type: 'spring', bounce: 0, duration: 0.8 });
-      animate(y, offsetY, { type: 'spring', bounce: 0, duration: 0.8 });
-      setScale(1.08);
-      
-      setTimeout(() => {
-        setSelectedCity(city);
-      }, 800);
+      setSelectedCity(city);
     }
   };
 
   const handleCityClick = (city: CityData) => {
-    setShowMapHint(false);
     setSelectedCity(city);
   };
 
-  const handleLocateCurrentCity = () => {
-    const city = CITIES.find(candidate => candidate.status === 'in-progress') || CITIES[0];
-    const mapWidth = 1200;
-    const mapHeight = 800;
-    const offsetX = (0.5 - city.x / 100) * mapWidth;
-    const offsetY = (0.5 - city.y / 100) * mapHeight + MAP_FOCUS_Y_OFFSET;
-
-    setShowMapHint(false);
-    setScale(1.08);
-    if (reduceMotion) {
-      x.set(offsetX);
-      y.set(offsetY);
-      return;
-    }
-
-    animate(x, offsetX, { duration: 0.48, ease: 'easeOut' });
-    animate(y, offsetY, { duration: 0.48, ease: 'easeOut' });
-  };
-
-  const handleCitySheetAction = (city: CityData) => {
-    setSelectedCity(null);
-    if (city.status !== 'upcoming' && onNavigate) {
-      onNavigate('cityRoutes', city);
-    }
-  };
-
   return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[var(--app-bg)]">
-      <div className="premium-map-wash pointer-events-none absolute inset-0 z-0" />
-
-      {/* Pannable/Zoomable Map Area */}
-      <div 
-        className="w-full h-full relative cursor-grab active:cursor-grabbing z-10 touch-none"
-        ref={containerRef}
-        onWheel={handleWheel}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-      >
-        <motion.div
-          drag
-          dragConstraints={containerRef}
-          dragElastic={0.2}
-          onDragStart={() => setShowMapHint(false)}
-          style={{ 
-            x, 
-            y,
-            backgroundImage: 'url("https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg")',
-            backgroundSize: 'contain',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            opacity: 0.82,
-            filter: 'contrast(1.06) brightness(0.62) saturate(0.62)'
-          }}
-          animate={{ scale }}
-          transition={{ scale: reduceMotion ? { duration: 0 } : { type: 'spring', bounce: 0.1, duration: 0.4 } }}
-          className="absolute top-1/2 left-1/2 w-[1200px] h-[800px] -translate-x-1/2 -translate-y-1/2 origin-center"
-        >
-          {/* Only keep routes completed during the current app session. */}
-          {sessionJourneySegments.length > 0 && (
-            <svg
-              viewBox="0 0 1200 800"
-              className="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible"
-              aria-hidden="true"
-            >
-              <defs>
-                <linearGradient id="journey-trail-gradient" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="rgba(100,210,255,0.18)" />
-                  <stop offset="70%" stopColor="rgba(100,210,255,0.48)" />
-                  <stop offset="100%" stopColor="rgba(255,214,102,0.62)" />
-                </linearGradient>
-              </defs>
-              {sessionJourneySegments.map(({ fromCity, toCity }, index) => {
-                const x1 = (fromCity.x / 100) * 1200;
-                const y1 = (fromCity.y / 100) * 800;
-                const x2 = (toCity.x / 100) * 1200;
-                const y2 = (toCity.y / 100) * 800;
-                const curveX = (x1 + x2) / 2 + (y2 - y1) * 0.14;
-                const curveY = (y1 + y2) / 2 - (x2 - x1) * 0.14;
-                const path = `M ${x1} ${y1} Q ${curveX} ${curveY} ${x2} ${y2}`;
-
-                return (
-                  <motion.path
-                    key={`${fromCity.id}-${toCity.id}`}
-                    d={path}
-                    fill="transparent"
-                    stroke="url(#journey-trail-gradient)"
-                    strokeWidth="2"
-                    strokeDasharray="7 11"
-                    strokeLinecap="round"
-                    initial={reduceMotion ? false : { pathLength: 0, opacity: 0 }}
-                    animate={{ pathLength: 1, opacity: 1 }}
-                    transition={{ duration: reduceMotion ? 0 : 0.6, delay: reduceMotion ? 0 : index * 0.08, ease: 'easeOut' }}
-                  />
-                );
-              })}
-            </svg>
-          )}
-
-          {/* Cities Nodes */}
-          {CITIES.map((city) => (
-            <MapCityNode
-              key={city.id}
-              city={city}
-              isCurrent={city.id === inProgressCity?.id}
-              isLit={city.status === 'lit'}
-              reduceMotion={reduceMotion}
-              weather={city.id === inProgressCity?.id ? currentCityWeather : undefined}
-              onSelect={handleCityClick}
-            />
-          ))}
-
-          {/* Flight Path Animation */}
-          {(() => {
-            if (!targetFlight) return null;
-            const fc = CITIES.find(c => c.id === targetFlight.fromCityId);
-            const tc = CITIES.find(c => c.id === targetFlight.toCityId);
-            if (!fc || !tc) return null;
-
-            const x1 = (fc.x / 100) * 1200;
-            const y1 = (fc.y / 100) * 800;
-            const x2 = (tc.x / 100) * 1200;
-            const y2 = (tc.y / 100) * 800;
-
-            const cx = (x1 + x2) / 2 + (y2 - y1) * 0.2;
-            const cy = (y1 + y2) / 2 - (x2 - x1) * 0.2;
-
-            const pathObj = `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
-
-            return (
-              <div className="absolute inset-0 pointer-events-none z-30">
-                <svg className="absolute inset-0 w-full h-full overflow-visible">
-                  <motion.path 
-                     d={pathObj}
-                     fill="transparent"
-                     strokeDasharray="8 8"
-                     stroke="rgba(34,211,238, 0.6)"
-                     strokeWidth="3"
-                     strokeLinecap="round"
-                     initial={{ pathLength: 0 }}
-                     animate={{ pathLength: 1 }}
-                     transition={{ duration: 3, delay: 0.5, ease: "easeInOut" }}
-                   />
-                   <motion.path 
-                     d={pathObj}
-                     fill="transparent"
-                     stroke="rgba(251,191,36, 0.4)"
-                     strokeWidth="5"
-                     strokeLinecap="round"
-                     className="blur-[8px]"
-                     initial={{ pathLength: 0 }}
-                     animate={{ pathLength: 1 }}
-                     transition={{ duration: 3, delay: 0.5, ease: "easeInOut" }}
-                   />
-                </svg>
-                <div className="absolute top-0 left-0 w-full h-full"> 
-                   <motion.div
-                     className="absolute flex flex-col items-center justify-center text-white pointer-events-none"
-                     style={{ 
-                       top: 0, 
-                       left: 0,
-                       offsetPath: `path('${pathObj}')`,
-                       offsetRotate: "auto 45deg"
-                     }}
-                     initial={{ offsetDistance: "0%", opacity: 0 }}
-                     animate={{ offsetDistance: "100%", opacity: 1 }}
-                     transition={{ 
-                        opacity: { duration: 0.1, delay: 0.5 },
-                        offsetDistance: { duration: 3, delay: 0.5, ease: "easeInOut" } 
-                     }}
-                   >
-                     <Plane size={20} fill="white" className="text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]" style={{ transform: 'translate(-50%, -50%)' }} />
-                   </motion.div>
-                </div>
-              </div>
-            );
-          })()}
-        </motion.div>
+    <div className={`relative flex h-full w-full items-center justify-center overflow-hidden ${spaceBackground === 'nebula' ? 'bg-[#040511]' : spaceBackground === 'starlight' ? 'bg-[#020713]' : 'bg-[#081827]'}`}>
+      {/* Solid atmospheric backdrop */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        {spaceBackground === 'nebula' ? (
+          <>
+            <div className="absolute inset-0 bg-[#040511]" />
+            <div className="absolute -left-[30%] -top-[8%] h-[66%] w-[105%] rounded-full bg-[radial-gradient(ellipse,rgba(99,102,241,0.3),rgba(34,211,238,0.08)_38%,transparent_70%)] opacity-90 blur-2xl" />
+            <div className="absolute -right-[28%] top-[22%] h-[62%] w-[90%] rounded-full bg-[radial-gradient(ellipse,rgba(217,70,239,0.2),rgba(45,212,191,0.06)_42%,transparent_72%)] blur-3xl" />
+            {HOME_NEBULA_STARS.map(star => (
+              <span
+                key={star.id}
+                className="absolute rounded-full bg-white"
+                style={{
+                  left: star.left,
+                  top: star.top,
+                  width: star.size,
+                  height: star.size,
+                  opacity: star.opacity,
+                  boxShadow: `0 0 ${star.size * 5}px rgba(196,181,253,0.7)`
+                }}
+              />
+            ))}
+            {!reduceMotion && HOME_NEBULA_METEORS.map(meteor => (
+              <motion.span
+                key={meteor.id}
+                className="absolute block h-px origin-right"
+                style={{ left: meteor.left, top: meteor.top, width: meteor.width, rotate: 30 }}
+                initial={{ x: -24, y: -14, opacity: 0, scaleX: 0.35 }}
+                animate={{
+                  x: [-24, meteor.distanceX],
+                  y: [-14, meteor.distanceY],
+                  opacity: [0, 0.92, 0.7, 0],
+                  scaleX: [0.35, 1, 0.78]
+                }}
+                transition={{
+                  delay: meteor.delay,
+                  duration: meteor.duration,
+                  repeat: Infinity,
+                  repeatDelay: meteor.repeatDelay,
+                  ease: 'easeOut'
+                }}
+                data-home-meteor={meteor.id}
+                aria-hidden="true"
+              >
+                <span className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-cyan-100/65 to-white shadow-[0_0_8px_rgba(165,243,252,0.7)]" />
+                <span className="absolute right-0 top-1/2 h-1 w-1 -translate-y-1/2 rounded-full bg-white shadow-[0_0_10px_rgba(224,247,255,0.95)]" />
+              </motion.span>
+            ))}
+            <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-[#040511]/80 via-[#040511]/20 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#040511] via-[#07091a]/70 to-transparent" />
+          </>
+        ) : spaceBackground === 'starlight' ? (
+          <>
+            <div className="absolute inset-0 bg-[#020713]" />
+            <div className="absolute -left-[48%] top-[9%] h-[46%] w-[198%] rotate-[18deg] bg-[linear-gradient(180deg,transparent_0%,rgba(96,165,250,0.06)_18%,rgba(186,230,253,0.24)_43%,rgba(224,242,254,0.32)_52%,rgba(129,140,248,0.16)_65%,transparent_100%)] blur-2xl mix-blend-screen" />
+            <div className="absolute -left-[38%] top-[23%] h-[15%] w-[174%] rotate-[18deg] bg-[linear-gradient(180deg,transparent,rgba(240,249,255,0.24),rgba(147,197,253,0.12),transparent)] blur-xl mix-blend-screen" />
+            <div className="absolute left-[-4%] top-[5%] h-[55%] w-[108%] rounded-full bg-[radial-gradient(ellipse,rgba(125,211,252,0.2),rgba(99,102,241,0.07)_46%,transparent_72%)] blur-3xl" />
+            <div className="absolute right-[-22%] top-[34%] h-[40%] w-[78%] rounded-full bg-[radial-gradient(ellipse,rgba(167,139,250,0.11),transparent_68%)] blur-3xl" />
+            {HOME_NEBULA_STARS.map(star => (
+              <motion.span
+                key={`starlight-${star.id}`}
+                className="absolute rounded-full bg-sky-50"
+                style={{
+                  left: star.left,
+                  top: star.top,
+                  width: Math.max(1, star.size),
+                  height: Math.max(1, star.size),
+                  boxShadow: `0 0 ${star.size * 6}px rgba(186, 230, 253, 0.76)`
+                }}
+                initial={{ opacity: Math.min(0.82, star.opacity + 0.16) }}
+                animate={reduceMotion ? undefined : { opacity: [0.3, Math.min(0.95, star.opacity + 0.32), 0.3] }}
+                transition={{ duration: 2.4 + (star.id % 4) * 0.55, delay: (star.id % 7) * 0.28, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            ))}
+            {HOME_STARLIGHT_FLARES.map(flare => (
+              <motion.span
+                key={flare.id}
+                className="absolute rounded-full bg-white shadow-[0_0_14px_rgba(224,242,254,0.95)]"
+                style={{ left: flare.left, top: flare.top, width: flare.size, height: flare.size }}
+                initial={{ opacity: 0.42, scale: 0.82 }}
+                animate={reduceMotion ? undefined : { opacity: [0.38, 1, 0.38], scale: [0.82, 1.18, 0.82] }}
+                transition={{ duration: 2.8, delay: flare.delay, repeat: Infinity, ease: 'easeInOut' }}
+                aria-hidden="true"
+              >
+                <span className="absolute left-1/2 top-1/2 h-px w-[220%] -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-sky-100/80 to-transparent" />
+                <span className="absolute left-1/2 top-1/2 h-[220%] w-px -translate-x-1/2 -translate-y-1/2 bg-gradient-to-b from-transparent via-sky-100/70 to-transparent" />
+              </motion.span>
+            ))}
+            <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-[#020713]/76 via-[#020713]/10 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#020713] via-[#050d1d]/62 to-transparent" />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-[#081827]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_52%_32%,rgba(34,211,238,0.18),transparent_38%),radial-gradient(circle_at_24%_74%,rgba(20,184,166,0.14),transparent_32%)]" />
+            <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-[#081827]/76 via-[#081827]/20 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#081827] via-[#081827]/62 to-transparent" />
+          </>
+        )}
       </div>
 
-      <div className="premium-vignette pointer-events-none absolute inset-0 z-[11]" />
+      {globeReady ? (
+        <React.Suspense
+          fallback={(
+            <div className="absolute inset-0 flex items-center justify-center" role="status" aria-label="地球加载中">
+              <div className="h-20 w-20 animate-pulse rounded-full border border-cyan-200/20 bg-cyan-200/5 shadow-[0_0_60px_rgba(34,211,238,0.12)]" />
+            </div>
+          )}
+        >
+          <div className="absolute inset-0 -translate-y-6">
+            <WorldGlobe
+              key={`${globeAppearance}-earth`}
+              cities={CITIES}
+              appearance={globeAppearance}
+              focusCityId={nextFocusCity?.id}
+              targetFlight={targetFlight}
+              onCityClick={handleCityClick}
+              onFlightComplete={onFlightComplete}
+            />
+          </div>
+        </React.Suspense>
+      ) : (
+        <div className="absolute inset-0" aria-hidden="true" />
+      )}
 
-      <button
-        type="button"
-        aria-label="定位当前探索城市"
-        onClick={handleLocateCurrentCity}
-        className="premium-material absolute right-4 top-[88px] z-20 flex h-11 w-11 items-center justify-center rounded-full text-white/78 transition-colors duration-200 hover:bg-white/[0.08] hover:text-[var(--accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-      >
-        <LocateFixed size={18} strokeWidth={1.8} />
-      </button>
-
-      <AnimatePresence>
-        {showMapHint && (
-          <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: reduceMotion ? 0 : 0.22, ease: 'easeOut' }}
-            className="pointer-events-none absolute left-4 top-[178px] z-20 whitespace-nowrap rounded-full border border-white/[0.10] bg-[#0a0e11]/82 px-3 py-2 text-[9px] font-medium text-white/58 shadow-lg backdrop-blur-xl"
-          >
-            拖动地图 · 轻触城市探索
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* HUD: profile and device state */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 p-4">
-        <div className="flex items-center justify-between gap-3">
+      {/* HUD: Top Overlay */}
+      <div className={`absolute left-0 right-0 top-0 z-20 flex items-start justify-between gap-3 bg-gradient-to-b px-5 pt-5 pointer-events-none ${spaceBackground === 'nebula' ? 'from-[#040511]/76' : spaceBackground === 'starlight' ? 'from-[#020713]/74' : 'from-[#081827]/68'} to-transparent`}>
+        
+        {/* User Info & Campaign Entry */}
+        <div className="flex w-[190px] flex-col items-start gap-2 pointer-events-auto">
           <button
-            type="button"
             onClick={() => onNavigate && onNavigate('glowCenter', null)}
-            className="premium-material pointer-events-auto flex min-w-0 items-center gap-2.5 rounded-[24px] p-1.5 pr-3.5 text-left transition-colors duration-200 hover:bg-white/[0.075] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+            className="flex w-full items-center gap-3 rounded-full border border-white/12 bg-slate-950/24 p-1.5 pr-4 text-left shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md hover:border-cyan-200/35 hover:bg-white/[0.075] transition-colors"
           >
-            <div className={`relative h-11 w-11 shrink-0 rounded-full bg-gradient-to-br ${avatarFrame.ring} p-[2px] ${avatarFrame.shadow}`}>
+            <div className={`relative h-12 w-12 rounded-full bg-gradient-to-br ${avatarFrame.ring} p-[2px] ${avatarFrame.shadow}`}>
               <div className="h-full w-full rounded-full bg-slate-950 p-[2px]">
                 <img
                   src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100&h=100"
-                  alt="木小六的头像"
+                  alt="用户头像"
                   className="h-full w-full rounded-full object-cover"
                 />
               </div>
-              <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-slate-950/95 px-1.5 py-[1px] text-[8px] font-black leading-none ${avatarFrame.badge}`}>
-                LV.{currentGlowRank.level}
+            </div>
+            <div>
+              <div className="text-sm font-black tracking-wide text-slate-50">沐小六</div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold text-slate-300">
+                <span>{currentGlowRank.name}</span>
+                <span className="text-slate-500">LV.{currentGlowRank.level}</span>
+              </div>
+              <div className="mt-1 h-1 w-20 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-200 to-amber-200"
+                  style={{ width: `${glowRankDetails.progress}%` }}
+                />
               </div>
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-semibold tracking-[-0.015em] text-white">木小六</p>
-              <p className="mt-0.5 text-[10px] font-medium text-amber-100/90">
-                {currentGlowRank.name}段位
-              </p>
-            </div>
           </button>
 
-          <div className="pointer-events-auto flex items-center gap-2">
-            <button
-              type="button"
-              aria-label={`查看光迹值，当前 ${userStats?.lightValue || 120}`}
-              onClick={() => onNavigate && onNavigate('glowCenter', null)}
-              className="premium-material flex min-h-12 items-center gap-2 rounded-[20px] px-3 text-white/95 transition-colors duration-200 hover:bg-white/[0.075] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          <button
+            type="button"
+            onClick={() => onNavigate?.('purchaseRefundCampaign', null)}
+            className="group relative flex h-10 w-full items-center gap-2.5 overflow-hidden rounded-[15px] border border-amber-100/20 bg-[#18212a]/82 px-3 text-left shadow-[0_12px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl outline-none transition active:scale-[0.985] focus-visible:ring-2 focus-visible:ring-amber-100/55"
+            aria-label="打开30天运动打卡返购机款活动"
+          >
+            <span className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-[radial-gradient(circle_at_100%_50%,rgba(251,191,36,0.15),transparent_72%)]" />
+            <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] border border-amber-100/20 bg-amber-200/9 text-amber-100">
+              <Gift size={14} />
+            </span>
+            <span className="relative min-w-0 flex-1 whitespace-nowrap text-[11px] font-black tracking-[-0.03em] text-white">30天运动打卡返购机款</span>
+            <ChevronRight size={15} className="relative shrink-0 text-amber-100/85 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        </div>
+
+        {/* Top Right Actions */}
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <button
+            type="button"
+            onClick={handleConnectTreadmill}
+            aria-label={isTreadmillConnected ? '跑步机已连接' : '连接跑步机'}
+            title={isTreadmillConnected ? '跑步机已连接' : '连接跑步机'}
+            className={cn(
+              "group relative flex h-11 w-11 items-center justify-center rounded-2xl backdrop-blur-md transition-all duration-300 shadow-lg border active:scale-95",
+              isTreadmillConnected 
+                ? "bg-emerald-500/20 border-emerald-300/60 hover:bg-emerald-500/25 shadow-[0_0_22px_rgba(52,211,153,0.24)]" 
+                : "bg-slate-950/35 border-cyan-300/30 hover:bg-cyan-400/15 hover:border-cyan-200/70 hover:shadow-[0_0_22px_rgba(34,211,238,0.2)]"
+            )}
+          >
+            <span className={cn(
+              "absolute inset-1 rounded-xl opacity-0 transition-opacity",
+              isTreadmillConnected ? "bg-emerald-300/10 opacity-100" : "bg-cyan-300/10 group-hover:opacity-100"
+            )} />
+            <svg
+              className={cn("relative z-10 h-6 w-6", isTreadmillConnected ? "text-emerald-300" : "text-cyan-300")}
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
             >
-              <Sparkles size={15} strokeWidth={1.9} className="text-[var(--accent)]" />
-              <span className="font-mono text-[13px] font-semibold">{userStats?.lightValue || 120}</span>
-            </button>
-            <button
-              type="button"
-              aria-label={isTreadmillConnected ? '跑步机已连接' : '连接跑步机'}
-              onClick={handleConnectTreadmill}
-              className={cn(
-                'premium-material relative flex h-12 w-12 items-center justify-center rounded-[20px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]',
-                isTreadmillConnected
-                  ? 'bg-emerald-300/10 text-emerald-200'
-                  : 'text-[var(--accent)] hover:bg-white/[0.075]'
-              )}
-            >
-              <TreadmillIcon />
-              <span className={cn('absolute right-2 top-2 h-1.5 w-1.5 rounded-full', isTreadmillConnected ? 'bg-[var(--success)]' : 'bg-white/25')} />
-            </button>
-          </div>
-        </div>
-
-      </header>
-
-      {/* Bottom controls and current journey */}
-      <div className="pointer-events-none absolute inset-x-4 bottom-4 z-20 flex flex-col gap-3">
-        <div className="pointer-events-auto grid grid-cols-3 gap-1.5">
-          <button
-            type="button"
-            className="premium-control flex min-h-[46px] items-center justify-center gap-1 rounded-[17px] text-[10px] font-medium text-white/74 transition-colors duration-200 hover:bg-white/[0.075] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-            onClick={() => onNavigate && onNavigate('litRecords', null)}
-          >
-            <Zap className="text-[var(--accent)]" size={14} strokeWidth={1.9} />
-            点亮记录
-          </button>
-          <button
-            type="button"
-            className="premium-control flex min-h-[46px] items-center justify-center gap-1 rounded-[17px] text-[10px] font-medium text-white/74 transition-colors duration-200 hover:bg-white/[0.075] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-            onClick={() => onNavigate && onNavigate('leaderboard', null)}
-          >
-            <Award className="text-[var(--accent)]" size={14} strokeWidth={1.9} />
-            排行榜
-          </button>
-          <button
-            type="button"
-            aria-label={hasClaimableDailyReward ? `今日任务，有 ${claimableDailyTasks.length} 项光迹值可领取` : '今日任务'}
-            className="premium-control relative flex min-h-[46px] items-center justify-center gap-1 rounded-[17px] text-[10px] font-medium text-white/74 transition-colors duration-200 hover:bg-white/[0.075] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-            onClick={() => setShowTaskPanel(true)}
-          >
-            <ClipboardCheck className="text-[var(--accent)]" size={14} strokeWidth={1.9} />
-            任务
-            <span className="rounded-full bg-white/[0.075] px-1.5 py-0.5 font-mono text-[9px] text-white/62">{completedDailyCount + completedWeeklyCount}/4</span>
+              <path
+                d="M5 17.5h10.4c1.4 0 2.6-.9 3-2.2l1.2-3.8"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M3.8 19.5h13.8"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M8.5 17.5 13 7.5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M12.2 7.5h5.3c.7 0 1.2.5 1.2 1.2v1.1c0 .7-.5 1.2-1.2 1.2h-6.9"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M16.1 8.9h.1"
+                stroke="currentColor"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+              />
+            </svg>
+            {isTreadmillConnected && (
+              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(52,211,153,0.85)]" />
+            )}
+            <span className="sr-only">
+              {isTreadmillConnected ? "跑步机已连接" : "连接跑步机"}
+            </span>
           </button>
         </div>
+      </div>
 
-        <div className="pointer-events-auto">
-          <ActivityQuickLaunch
-            onSelectMedalLottery={onSelectMedalLottery}
-            onSelectMedley={onSelectMedley}
-            onSelectWeightLossPlan={onSelectWeightLossPlan}
-            onSelectHundredCities={onSelectHundredCities}
-            drawCounts={activityDrawCounts}
-          />
-        </div>
 
+      {/* Right Quick Rail */}
+      <div className="absolute right-5 top-[42%] z-20 flex -translate-y-1/2 flex-col items-center gap-3 pointer-events-auto">
+        <button
+          className="group flex flex-col items-center gap-1.5 text-[10px] font-black text-slate-200"
+          onClick={() => onNavigate && onNavigate('routeCollection', null)}
+          aria-label="打开城市图鉴"
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/14 bg-slate-950/34 text-cyan-200 shadow-[0_12px_34px_rgba(0,0,0,0.26)] backdrop-blur-md transition group-hover:border-cyan-200/50 group-hover:bg-cyan-300/12">
+            <Zap size={18} />
+          </span>
+          城市图鉴
+        </button>
+        <button
+          className="group flex flex-col items-center gap-1.5 text-[10px] font-black text-slate-200"
+          onClick={() => onNavigate && onNavigate('leaderboard', null)}
+        >
+          <span className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/14 bg-slate-950/34 text-cyan-200 shadow-[0_12px_34px_rgba(0,0,0,0.26)] backdrop-blur-md transition group-hover:border-cyan-200/50 group-hover:bg-cyan-300/12">
+            <Award size={18} />
+          </span>
+          排行榜
+        </button>
+        <button
+          className="group flex flex-col items-center gap-1.5 text-[10px] font-black text-orange-100"
+          onClick={() => onNavigate && onNavigate('weightLossPlan', null)}
+          aria-label="打开打卡红包活动"
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-full border border-orange-200/24 bg-orange-300/12 text-orange-200 shadow-[0_12px_34px_rgba(0,0,0,0.26)] backdrop-blur-md transition group-hover:border-orange-200/50 group-hover:bg-orange-300/18">
+            <Flame size={18} />
+          </span>
+          打卡领红包
+        </button>
         <button
           type="button"
-          className="premium-material-strong pointer-events-auto relative w-full overflow-hidden rounded-[30px] p-[18px] text-left transition-colors duration-200 hover:bg-[#101418]/95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-          onClick={() => setShowStoryPanel(true)}
+          onClick={() => onNavigate && onNavigate('onlineSupport', null)}
+          className="group flex flex-col items-center gap-1.5 text-[11px] font-black text-cyan-50"
+          aria-label="打开在线客服"
         >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              {inProgressCity && (
-                <div className="mb-1.5 flex items-center gap-2">
-                  <span className="flex min-w-0 items-center gap-1 truncate text-[10px] font-medium text-white/60">
-                    <MapPin size={11} strokeWidth={1.9} className="shrink-0" />
-                    {inProgressCity.name} · {inProgressCity.completed}/{inProgressCity.routes} 路线
-                  </span>
-                </div>
-              )}
-              <h3 className="text-[18px] font-semibold tracking-[-0.025em] text-white">奔跑·点亮地球计划</h3>
-              <p className="mt-1.5 truncate text-[11px] font-medium leading-relaxed text-white/66">{journeyPromptText}</p>
-            </div>
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.11] bg-white/[0.07] text-white/82">
-              <ChevronRight size={19} strokeWidth={1.9} />
-            </span>
-          </div>
-
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.07]">
-            <div
-              style={{ width: progressWidth }}
-              className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-300 ease-out"
-            />
-          </div>
+          <span className="relative flex h-12 w-12 items-center justify-center rounded-full border border-cyan-100/45 bg-gradient-to-br from-cyan-300/28 via-[#0c2636]/88 to-[#07111f]/90 text-cyan-50 shadow-[0_14px_36px_rgba(0,0,0,0.32),0_0_24px_rgba(34,211,238,0.22),inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-md transition group-hover:border-cyan-100/70 group-hover:from-cyan-200/34 group-hover:shadow-[0_16px_38px_rgba(0,0,0,0.34),0_0_32px_rgba(34,211,238,0.3),inset_0_1px_0_rgba(255,255,255,0.22)] group-focus-visible:border-cyan-100/80 group-focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-cyan-200/45">
+            <span className="absolute inset-[-5px] rounded-full border border-cyan-200/12 opacity-80 shadow-[0_0_28px_rgba(34,211,238,0.16)]" />
+            <HeadphonesIcon size={20} strokeWidth={2.4} className="relative" />
+          </span>
+          在线客服
         </button>
       </div>
 
-      {/* City discovery bottom sheet */}
+      {/* Bottom Area */}
+      <div className="absolute bottom-2 left-4 right-4 z-20 pointer-events-none flex flex-col gap-2">
+        {/* Bottom Mission Card (Teaser) */}
+        <div
+          className="relative w-full cursor-pointer overflow-hidden rounded-[22px] border border-cyan-100/16 bg-[#142538]/76 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.36),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl pointer-events-auto transition-colors hover:border-cyan-200/32"
+          onClick={() => setShowStoryPanel(true)}
+        >
+          <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_18%_0%,rgba(103,232,249,0.18),transparent_48%),radial-gradient(circle_at_84%_0%,rgba(148,163,184,0.14),transparent_46%)] pointer-events-none" />
+          <div className="relative grid grid-cols-[0.9fr_1.1fr] gap-3">
+            <div className="flex min-h-[126px] flex-col border-r border-white/10 pr-3">
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-xs font-black tracking-wide text-white">点亮地球计划</h3>
+                <span className="flex h-4 w-4 items-center justify-center rounded-full border border-white/12 text-[10px] text-slate-400">i</span>
+              </div>
+              <p className="mt-4 flex items-end gap-1 leading-none text-cyan-100">
+                <span className="pb-1 text-base font-black tracking-[-0.03em]">点亮：</span>
+                <span className="font-mono text-[44px] font-black tracking-[-0.07em] tabular-nums">{litCount}</span>
+                <span className="pb-1 text-base font-black tracking-[-0.03em]">座城市</span>
+              </p>
+              <div className="mt-auto text-[11px] font-bold leading-5 text-slate-400">
+                <p>解锁：<span className="font-mono text-sm font-black text-slate-100">{availableCityCount}</span> 条路线</p>
+              </div>
+            </div>
+
+            <div className="flex min-h-[126px] min-w-0 flex-col gap-3 pl-1">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400">正在点亮的城市</p>
+                <div className="mt-2 flex items-start gap-3">
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+                    {nextFocusCity && (
+                      <CityImage
+                        src={getCityPreviewImage(nextFocusCity)}
+                        alt={nextFocusCity.name}
+                        fallbackLabel={nextFocusCity.name}
+                        className="h-full w-full object-cover object-center"
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/45 to-transparent" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="truncate text-lg font-black leading-tight text-white">{nextFocusCity?.name || '下一城'}</h4>
+                    <p className="mt-0.5 truncate text-[11px] font-bold text-slate-400">{inProgressCity ? '信号接收中...' : '等待开启探索'}</p>
+                    <div className="mt-1.5 flex items-center gap-0.5">
+                      {Array.from({ length: 18 }).map((_, index) => (
+                        <span
+                          key={index}
+                          className={cn(
+                            "h-3 w-0.5 rounded-full",
+                            index < Math.round((Number.parseFloat(progressWidth) || 0) / 100 * 18) ? "bg-cyan-200" : "bg-white/10"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (nextFocusCity && onNavigate) {
+                    onNavigate('cityRoutes', nextFocusCity);
+                  } else {
+                    setShowStoryPanel(true);
+                  }
+                }}
+                className="mt-auto flex h-9 w-full items-center justify-center rounded-full border border-cyan-100/18 bg-cyan-100/[0.08] text-xs font-black text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] active:scale-95"
+              >
+                前往探索
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="flex w-full items-center gap-3 rounded-[18px] border border-amber-200/18 bg-[#14283c]/74 px-3.5 py-3 text-left shadow-[0_16px_44px_rgba(0,0,0,0.24)] backdrop-blur-xl pointer-events-auto"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-200/18 bg-amber-200/10 text-amber-200 shadow-[0_0_18px_rgba(251,191,36,0.13)]">
+            <Radio size={15} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="mb-0.5 flex items-center gap-1.5">
+              <span className="text-[9px] font-black uppercase tracking-[0.18em] text-amber-100/70">信号广播</span>
+              <span className="h-1 w-1 rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(110,231,183,0.7)]" />
+            </div>
+            <div className="relative h-4 overflow-hidden">
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.p
+                  key={`${activeBroadcast.type}-${broadcastIndex}`}
+                  initial={{ y: 12, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -12, opacity: 0 }}
+                  transition={{ duration: 0.26, ease: 'easeOut' }}
+                  className="absolute inset-x-0 top-0 truncate text-[11px] font-bold text-slate-200"
+                >
+                  {activeBroadcast.text}
+                </motion.p>
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* City Popup Card Overlay */}
       <AnimatePresence>
         {selectedCity && !showStoryPanel && (
-          <CityDiscoverySheet
-            city={selectedCity}
-            isCurrent={selectedCity.id === inProgressCity?.id}
-            reduceMotion={reduceMotion}
-            weather={selectedCity.id === inProgressCity?.id ? currentCityWeather : undefined}
-            onClose={() => setSelectedCity(null)}
-            onAction={handleCitySheetAction}
-          />
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 bg-black/40 flex items-center justify-center p-6 backdrop-blur-[2px]"
+            onClick={() => setSelectedCity(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="w-full max-w-sm bg-slate-900/90 backdrop-blur-xl rounded-3xl overflow-hidden border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
+              onClick={(e) => {
+                 e.stopPropagation();
+                 if (selectedCity.status !== 'upcoming') {
+                   setSelectedCity(null);
+                   if (onNavigate) {
+                     onNavigate('cityRoutes', selectedCity);
+                   }
+                 }
+              }}
+            >
+              <div className="relative h-48 w-full">
+                <CityImage src={selectedCity.image} alt={selectedCity.name} fallbackLabel={selectedCity.name} className="absolute inset-0 w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent" />
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCity(null);
+                  }}
+                  className="absolute top-4 right-4 w-8 h-8 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors text-white"
+                >
+                  <X size={16} />
+                </button>
+                <div className="absolute bottom-4 left-6">
+                   <h3 className="text-3xl font-bold text-white tracking-widest drop-shadow-md">{selectedCity.name}</h3>
+                   <p className="text-sm font-medium text-cyan-300 uppercase tracking-widest mt-1 opacity-80">{selectedCity.englishName}</p>
+                </div>
+              </div>
+              
+              <div className="p-6 pt-2">
+                 {selectedCity.status === 'upcoming' ? (
+                   <div className="flex flex-col items-center justify-center py-8">
+                     <Lock size={32} className="text-slate-500 mb-4" />
+                     <p className="text-slate-400 font-medium">即将上线时间: 2026年下半年</p>
+                   </div>
+                 ) : (
+                   <>
+                     <div className="flex justify-between text-sm mb-6 bg-white/5 rounded-xl p-4 border border-white/5">
+                       <div className="flex flex-col items-center">
+                         <span className="text-2xl font-bold text-slate-100 mb-1">{selectedCity.routes}</span>
+                         <span className="text-[10px] text-slate-500 uppercase tracking-widest">路线</span>
+                       </div>
+                       <div className="w-px bg-white/10" />
+                       <div className="flex flex-col items-center">
+                         <span className="text-2xl font-bold text-slate-100 mb-1">{selectedCity.spots}</span>
+                         <span className="text-[10px] text-slate-500 uppercase tracking-widest">景点</span>
+                       </div>
+                       <div className="w-px bg-white/10" />
+                       <div className="flex flex-col items-center">
+                         <span className="text-2xl font-bold text-slate-100 mb-1">{selectedCity.status === 'lit' ? '100%' : `${Math.round((selectedCity.completed / selectedCity.routes) * 100)}%`}</span>
+                         <span className="text-[10px] text-slate-500 uppercase tracking-widest">完成度</span>
+                       </div>
+                     </div>
+
+                     <div className="mb-6">
+                        <div className="flex justify-between items-end mb-2">
+                           <span className="text-[10px] text-slate-400">唤醒进度</span>
+                           <span className="text-xs font-mono font-medium text-amber-500">{selectedCity.completed} / {selectedCity.routes}</span>
+                        </div>
+                        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                           <div 
+                             className="h-full bg-amber-500 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]" 
+                             style={{ width: `${(selectedCity.completed / selectedCity.routes) * 100}%` }} 
+                           />
+                        </div>
+                     </div>
+
+                     <button 
+                       className="w-full py-4 bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold rounded-xl transition-colors tracking-wide shadow-[0_0_20px_rgba(34,211,238,0.2)]"
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         setSelectedCity(null);
+                         if (onNavigate) {
+                           onNavigate('cityRoutes', selectedCity);
+                         }
+                       }}
+                     >
+                       进入这座城市
+                     </button>
+                   </>
+                 )}
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -1236,7 +830,7 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
               <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 blur-3xl rounded-full pointer-events-none" />
               <div>
                 <h2 className="text-2xl font-bold text-slate-100 mb-1">奔跑·点亮地球计划</h2>
-                <p className="text-xs text-cyan-400 opacity-80 tracking-widest font-mono">MOVEVI World Light Project</p>
+                <p className="text-xs text-cyan-400 opacity-80 tracking-widest font-mono">MOVEVI 世界点亮计划</p>
               </div>
               <button 
                 onClick={() => setShowStoryPanel(false)}
@@ -1252,7 +846,7 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
                   "600年以后，人类早已离开地球，生活在群星之间。我们建造了新的城市、新的轨道、新的家园。"
                 </p>
                 <p className="text-xs text-slate-300 leading-relaxed font-medium italic mb-3">
-                  "可是走向宇宙深处，人们越开始想念那颗蓝色的母星。想念巴黎清晨的雾，想念东京街口的人潮，想念开罗金字塔前吹来的热风，也想念南京城墙下，梧桐叶落在路面的声音..."
+                  "可是走向宇宙深处，人们越开始想念那颗蓝色的母星。想念巴黎清晨的雾，想念东京街口的人潮，想念开罗金字塔前吹来的热风，也想念新加坡滨海湾，海风穿过花园城市的声音..."
                 </p>
                 <p className="text-xs text-slate-300 leading-relaxed font-medium">
                   你，不是普通运动者。你是一名<span className="text-cyan-400 font-bold mx-1">光迹探索者 (Glowtrail Explorer)</span>。<br/>
@@ -1274,7 +868,7 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
                 </div>
               ) : (
                 <div className="space-y-6 relative before:absolute before:inset-0 before:ml-[15px] before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-cyan-500 before:via-slate-700 before:to-slate-800">
-                  {Array.from({ length: Math.min(litCityIds.length + 1, 12) }).map((_, index) => {
+                  {Array.from({ length: Math.min(litCityIds.length + 1, CITIES.length) }).map((_, index) => {
                     const cityId = litCityIds[index];
                     const numStr = numMap[index] || (index + 1).toString();
                     
@@ -1391,7 +985,7 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
                   onClick={() => handleCitySelect(city)}
                 >
                   <div className="relative h-28">
-                    <img src={city.image} alt={city.name} className="absolute inset-0 w-full h-full object-cover opacity-60" referrerPolicy="no-referrer" />
+                    <CityImage src={city.image} alt={city.name} fallbackLabel={city.name} className="absolute inset-0 w-full h-full object-cover opacity-60" />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-4 flex flex-col justify-end">
                       <div className="flex items-center justify-between mb-2">
@@ -1520,7 +1114,7 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
 
       {/* Task Panel */}
       <AnimatePresence>
-        {showTaskPanel && (
+        {ENABLE_GLOW_TASKS && showTaskPanel && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1540,14 +1134,12 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
               <div className="relative">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-black tracking-[0.24em] text-indigo-200">GLOW TASKS</p>
+                  <p className="text-[10px] font-black tracking-[0.24em] text-indigo-200">光迹任务</p>
                   <h2 className="mt-1 text-xl font-black tracking-tight text-white">光迹任务</h2>
                 </div>
                 <button
-                  type="button"
-                  aria-label="关闭任务面板"
                   onClick={() => setShowTaskPanel(false)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-colors hover:bg-white/10"
                 >
                   <X size={18} />
                 </button>
@@ -1706,9 +1298,12 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
             >
                <h3 className="text-xl font-bold text-white mb-3">切换城市</h3>
                <p className="text-slate-400 text-sm mb-6 leading-relaxed">
-                 切换城市将消耗<span className="text-amber-400 font-bold mx-1">30点光迹值</span>。<br/>
-                 是否继续？
-               </p>
+                  {citySwitchPasses > 0 ? (
+                    <>本次优先使用 <span className="text-cyan-200 font-bold mx-1">1 张城市切换券</span>。<br />当前持有 {citySwitchPasses} 张</>
+                  ) : (
+                    <>切换城市将消耗<span className="text-amber-400 font-bold mx-1">3 点光迹值</span>。<br />是否继续？</>
+                  )}
+                </p>
                
                <div className="flex gap-3">
                  <button 
@@ -1719,21 +1314,49 @@ export default function HomeTab({ onNavigate, completedChapters = [], targetFlig
                  </button>
                  <button 
                    onClick={() => {
-                      if (userStats && userStats.lightValue >= 30) {
-                        if (setUserStats) {
-                          setUserStats((prev: any) => ({ ...prev, lightValue: prev.lightValue - 30 }));
-                        }
+                       const useSwitchPass = citySwitchPasses > 0;
+                       if (userStats && (useSwitchPass || userStats.lightValue >= 3)) {
+                         if (setUserStats) {
+                           setUserStats((prev: any) => {
+                             if (useSwitchPass) {
+                               return {
+                                 ...prev,
+                                 citySwitchPasses: Math.max(0, (prev.citySwitchPasses || 0) - 1),
+                                 glowShopInventory: {
+                                   ...(prev.glowShopInventory || {}),
+                                   'city-switch-pack': Math.max(0, (prev.glowShopInventory?.['city-switch-pack'] || 0) - 1)
+                                 }
+                               };
+                             }
+
+                             return {
+                               ...prev,
+                               lightValue: prev.lightValue - 3,
+                               glowValueRecords: [
+                                 {
+                                   id: `city-switch-${Date.now()}`,
+                                   type: 'spend',
+                                   title: '切换探索城市',
+                                   description: '重新选择下一座城市',
+                                   amount: 3,
+                                   createdAt: Date.now()
+                                 },
+                                 ...(prev.glowValueRecords || [])
+                               ]
+                             };
+                           });
+                         }
                         const available = CITIES.filter(c => c.status !== 'lit' && c.status !== 'upcoming');
                         const shuffled = [...available].sort(() => 0.5 - Math.random());
                         setSelectableCities(shuffled.slice(0, 3));
                         setShowSwitchConfirm(false);
                         setShowStoryPanel(false); // Close story panel as well right away
                         setShowCitySelection(true);
-                        setToastMessage('已消耗30点光迹值重新选择城市');
+                         setToastMessage(useSwitchPass ? '已使用 1 张城市切换券' : '已消耗 3 点光迹值重新选择城市');
                         setTimeout(() => setToastMessage(null), 3000);
                       } else {
                         setShowSwitchConfirm(false);
-                        setToastMessage('光迹值不足 (需要30点)');
+                        setToastMessage('光迹值不足（需要 3 点）');
                         setTimeout(() => setToastMessage(null), 3000);
                       }
                    }}
