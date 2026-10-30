@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { drawsLeft, ownPieces, puzzleComplete, type PuzzleTeam, type RelayDraw } from '../journey/puzzleTeam';
 import { WEEKEND_PRIZES } from '../journey/weekendRelay';
 import styles from './WeekendRelayWheel.module.css';
-export default function WeekendRelayWheel({team,onDraw}:{team:PuzzleTeam;onDraw:(id:string)=>RelayDraw|undefined}) {
+export default function WeekendRelayWheel({team,onDraw,preview=false}:{team:PuzzleTeam;onDraw:(id:string)=>RelayDraw|undefined;preview?:boolean}) {
   const [rotation,setRotation]=useState(0),[spinning,setSpinning]=useState(false),[result,setResult]=useState<number|null>(null);
   const [error,setError]=useState('');
   const guard=useRef(false),timer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
@@ -39,7 +39,7 @@ export default function WeekendRelayWheel({team,onDraw}:{team:PuzzleTeam;onDraw:
     <button className={styles.button} disabled={!remaining||spinning} onClick={spin}>{spinning?'抽奖中…':!unlocked?'暂未解锁':remaining?'转一次':'本期机会已用完'}</button>
     {error&&<p className={styles.error} role="alert">{error}</p>}
     {history.length>0&&<section className={styles.history} aria-label="我的抽奖记录"><h3>我的抽奖记录</h3><ol>{history.slice().reverse().map((d,i)=><li key={d.id}><span>第 {history.length-i} 次</span><strong><small>¥</small>{(d.cents/100).toFixed(2)}</strong></li>)}</ol></section>}
-    <details className={styles.rules}><summary>奖项与规则</summary><p>两人全部完成 3 条后，完成 2 条获得 2 次，完成 1 条获得 1 次，刷新不会重置。结果在转动前保存，关闭页面后仍可查看；活动结束后保留未用机会。</p><p>复用串烧奖项：0.18 / 0.38 / 0.88 / 1.88 / 5.88 / 8.88 元。初始各 80 / 148 / 40 / 25 / 5 / 2 份，本机按剩余份数随机抽取。扇区大小不代表概率。</p></details>
+    <details className={styles.rules}><summary>奖项与规则</summary><p>两人完成 3 条不同路线后，完成 2 条获得 2 次，完成 1 条获得 1 次。{preview?'当前为流程预览，重新进入活动或刷新将从头开始。':'进度与结果保存在本机，刷新不会重置，活动结束后保留未用机会。'}结果在转动前保存。</p><p>奖项金额：0.18 / 0.38 / 0.88 / 1.88 / 5.88 / 8.88 元。初始各 80 / 148 / 40 / 25 / 5 / 2 份，本机按剩余份数随机抽取。扇区大小不代表概率。</p></details>
     <p className={styles.note}>本机抽奖演示，尚未接入真实奖池或现金发放。</p>
   </section>;
 }

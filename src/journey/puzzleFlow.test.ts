@@ -85,7 +85,8 @@ test('instant preview completions preserve route deduplication, personal quota a
   state=finish('second','self',routes[1]);
   assert.equal(finish('over-quota','self',routes[2]),state);
   assert.equal(drawsLeft(currentPuzzle(state)!),0);
-  state=finish('third','peer',routes[0]);
+  assert.equal(finish('partner-repeat','peer',routes[0]),state);
+  state=finish('third','peer',routes[2]);
   const restored=readPuzzle({getItem:()=>JSON.stringify(state)}),team=currentPuzzle(restored)!;
   assert.equal(puzzleComplete(team),true);
   assert.equal(drawsLeft(team,'self'),2);
@@ -109,7 +110,7 @@ test('a new city unlocks its next route through activity completion without leav
     assert.equal(getCompletedRouteIds(journey,city.id).length,index+1);
     assert.equal(getRouteStatus(journey,city.id,toRoute(index+1).routeId),'discoverable');
   }
-  const route=toRoute(0);state=finishPuzzle(state,'new-city',{id:'peer-1',memberId:'peer',slot:2,route,startedAt:now,finishedAt:now+route.minutes*60000,distanceKm:route.distanceKm},now+route.minutes*60000);
+  const route=toRoute(2);state=finishPuzzle(state,'new-city',{id:'peer-1',memberId:'peer',slot:2,route,startedAt:now,finishedAt:now+route.minutes*60000,distanceKm:route.distanceKm},now+route.minutes*60000);
   assert.equal(puzzleComplete(currentPuzzle(state)!),true);assert.equal(drawsLeft(currentPuzzle(state)!,'self'),2);assert.equal(drawsLeft(currentPuzzle(state)!,'peer'),1);
 });
 
@@ -161,7 +162,7 @@ for (const entry of ['create', 'join'] as const) {
       locked(); locked('peer');
       const two = myContribution === 2 ? 'self' : 'peer';
       const one = myContribution === 1 ? 'self' : 'peer';
-      const legs = [[two, routes[0]], [two, routes[1]], [one, routes[0]]] as const;
+      const legs = [[two, routes[0]], [two, routes[1]], [one, routes[2]]] as const;
       for (const [index, [memberId, route]] of legs.entries()) {
         now += 1000;
         const startedAt = now;

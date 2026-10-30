@@ -17,6 +17,7 @@ for(const ownCompleted of [0,1,2])test(`partner can finish after ${ownCompleted}
     state=finishPuzzle(state,'free-order',{id:'own-'+index,memberId:'self',slot:state.teams[0].pieces.length,route,startedAt:FRIDAY,finishedAt:FRIDAY,distanceKm:3});
   };
   for(let i=0;i<ownCompleted;i++)finishSelf(i);
+  if(ownCompleted)assert.equal(finishPuzzleDemoPartner(state,FRIDAY,state.teams[0].pieces[0].route),state,'simulated partner cannot reuse a self-completed route');
   assert.equal(finishPuzzleDemoPartner(state,weekendPeriod(FRIDAY).endsAt,thirdRoute),state);
   assert.equal(finishPuzzleDemoPartner(state,FRIDAY,{...thirdRoute,id:'another-city'}),state);
   state=finishPuzzleDemoPartner(state,FRIDAY,thirdRoute);

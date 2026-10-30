@@ -58,7 +58,7 @@ export default function RouteDetailView({ cityId, routeIndex, image, routeOverri
   return (
     <div className={styles.page}>
       <main className={styles.scrollArea} inert={showComments || undefined}>
-        <StickyHeroNav>
+        <StickyHeroNav transparent>
           <button type="button" onClick={onBack} className={styles.back} aria-label="返回">
             <ChevronLeft size={22} />
           </button>

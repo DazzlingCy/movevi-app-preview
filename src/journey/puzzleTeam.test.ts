@@ -68,8 +68,12 @@ test('duplicate records/routes, partial runs, outsiders and late completions can
  assert.equal(finishPuzzle(s,'team',piece('late-submit'),BASE+3*86400000),s);
  s=finishPuzzle(s,'team',piece('a'));assert.equal(finishPuzzle(s,'team',piece('a')),s);assert.equal(finishPuzzle(s,'team',piece('dup-route','self','a')),s);
 });
-test('different members may run the same route; concurrent starts get sequential stamps',()=>{
- let s=pair();s=finishPuzzle(s,'team',piece('a'));s=finishPuzzle(s,'team',piece('friend-a','partner','a'));s=finishPuzzle(s,'team',piece('b'));
+test('different members cannot credit the same route; concurrent finishes are checked against latest team state',()=>{
+ let s=pair();s=finishPuzzle(s,'team',piece('a'));
+ assert.equal(finishPuzzle(s,'team',piece('friend-a','partner','a')),s);
+ s=finishPuzzle(s,'team',piece('friend-c','partner','c'));
+ assert.equal(finishPuzzle(s,'team',piece('self-c','self','c')),s);
+ s=finishPuzzle(s,'team',piece('b'));
  assert.deepEqual(s.teams[0].pieces.map(p=>p.slot),[0,1,2]);assert.equal(puzzleComplete(s.teams[0]),true);assert.equal(finishPuzzle(s,'team',piece('extra','partner')),s);
 });
 test('awarded contribution draws persist, cannot exceed 2+1, and survive activity expiry',()=>{
@@ -101,6 +105,8 @@ test('restrict recommendations to the team city, exclude completed routes and pr
  const routes=[{...piece('long').route,minutes:40},{...piece('short').route,minutes:15},{...piece('other').route,id:'paris',minutes:25}];
  const before=JSON.stringify(routes),s=finishPuzzle(pair(),'team',piece('done','self','short'));
  assert.deepEqual(puzzleRouteChoices(s.teams[0],routes,'tokyo').map(r=>r.routeId),['long']);assert.deepEqual(puzzleRouteChoices(s.teams[0],routes.slice(0,2)).map(r=>r.routeId),['long']);assert.equal(JSON.stringify(routes),before);
+ const partnerDone=finishPuzzle(s,'team',piece('partner-long','partner','long'));
+ assert.deepEqual(puzzleRouteChoices(partnerDone.teams[0],routes),[]);
 });
 test('invalid storage falls back safely',()=>{assert.deepEqual(readPuzzle({getItem:()=>'{invalid'}),emptyPuzzleState());});
 

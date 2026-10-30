@@ -24,10 +24,10 @@ export function openPuzzleTeams(state:PuzzleState,now:number):PuzzleTeam[] {
   return state.teams.filter(t=>!t.archived&&t.period.id===period.id&&periodOpen(t.period,now)&&t.members.length===1&&!t.members.some(m=>m.id==='self')&&!puzzleComplete(t));
 }
 export function puzzleRouteChoices(team: PuzzleTeam | undefined, routes: PuzzleRoute[], cityId?: string): PuzzleRoute[] {
-  const own = team ? ownPieces(team) : [];
+  const completed = team?.pieces ?? [];
   const selectedCityId = team?.city.id ?? cityId;
   return routes.filter(r => (!selectedCityId || r.id === selectedCityId) && Number.isFinite(r.minutes) && r.minutes > 0 && Number.isFinite(r.distanceKm) && r.distanceKm > 0
-    && !own.some(p => p.route.id === r.id && p.route.routeId === r.routeId))
+    && !completed.some(p => p.route.id === r.id && p.route.routeId === r.routeId))
     .sort((a,b) => a.minutes - b.minutes || a.routeIndex - b.routeIndex);
 }
 export function createPuzzle(state: PuzzleState, city: PuzzleCity, id: string, now: number, creator:Pick<PuzzleMember,'id'|'name'|'avatarUrl'>={id:'self',name:'你'}): PuzzleState {
@@ -52,7 +52,7 @@ export function finishPuzzle(state: PuzzleState, teamId: string, piece: PuzzlePi
     ||!Number.isInteger(piece.slot)||piece.slot<0||piece.slot>2
     ||!team.members.some(m=>m.id===piece.memberId)||ownPieces(team,piece.memberId).length>=2
     ||state.teams.some(t=>t.pieces.some(p=>p.id===piece.id))
-    ||team.pieces.some(p=>p.memberId===piece.memberId&&p.route.id===piece.route.id&&p.route.routeId===piece.route.routeId))return state;
+    ||team.pieces.some(p=>p.route.id===piece.route.id&&p.route.routeId===piece.route.routeId))return state;
   return {...state,teams:state.teams.map(t=>t.id===teamId?{...t,pieces:[...t.pieces,{...piece,slot:t.pieces.length}]}:t)};
 }
 export function drawsLeft(team:PuzzleTeam,memberId='self'):number {

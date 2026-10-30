@@ -1684,7 +1684,7 @@ export default function JourneyApp() {
     const team = periodParticipation(puzzle.state,weekendPeriod(puzzle.now()).id);
     const available = puzzleRoutes.find(r => r.id === route.id && r.routeId === route.routeId);
     if (!team || team.archived || team.members.length !== 2 || !periodOpen(team.period,puzzle.now()) || !available || available.id !== team.city.id || puzzleComplete(team) || ownPieces(team).length >= 2
-      || ownPieces(team).some(p => p.route.id === route.id && p.route.routeId === route.routeId)) { setNotice('路线状态已更新，请返回活动页重新选择。'); return; }
+      || team.pieces.some(p => p.route.id === route.id && p.route.routeId === route.routeId)) { setNotice('路线状态已更新，请返回活动页重新选择。'); return; }
     const slot = team.pieces.length;
     const target: ActivityRouteTarget = {source:'teamRelay',cityId:available.id,routeIndex:available.routeIndex,image:available.image,taskId:String(slot)};
     dispatch({ type:'REVEAL_ROUTE',cityId:available.id,routeId:available.routeId });
@@ -1763,7 +1763,7 @@ export default function JourneyApp() {
         : activityRoute ? <motion.div className="screen-layer" key="activity-route-detail" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><RouteDetailView cityId={activityRoute.cityId} routeIndex={activityRoute.routeIndex} image={activityRoute.image} routeOverride={activityRoute.source === 'teamRelay' ? toLegacyRouteItem(getJourneyCity(activityRoute.cityId)!.routes[activityRoute.routeIndex-1],state) : undefined} onBack={() => setActivityRoute(null)} onStart={() => {
           if (activityRoute.source === 'teamRelay') {
             const team = periodParticipation(puzzle.state,weekendPeriod(puzzle.now()).id); const route = puzzleRoutes.find(r => r.id === activityRoute.cityId && r.routeIndex === activityRoute.routeIndex);
-            if (!team || team.archived || team.members.length !== 2 || !periodOpen(team.period,puzzle.now()) || !route || route.id !== team.city.id || puzzleComplete(team) || ownPieces(team).length >= 2 || ownPieces(team).some(p => p.route.id === route.id && p.route.routeId === route.routeId)) { setNotice('路线状态已更新，请返回活动页重新选择。'); return; }
+            if (!team || team.archived || team.members.length !== 2 || !periodOpen(team.period,puzzle.now()) || !route || route.id !== team.city.id || puzzleComplete(team) || ownPieces(team).length >= 2 || team.pieces.some(p => p.route.id === route.id && p.route.routeId === route.routeId)) { setNotice('路线状态已更新，请返回活动页重新选择。'); return; }
             puzzleSession.current = {id:crypto.randomUUID(),teamId:team.id,startedAt:puzzle.now(),slot:Number(activityRoute.taskId),route};
             dispatch({ type:'REVEAL_ROUTE',cityId:route.id,routeId:route.routeId });
           }

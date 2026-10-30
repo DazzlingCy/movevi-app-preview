@@ -22,9 +22,9 @@ export function joinPuzzleDemoPartner(state:PuzzleState,now:number):PuzzleState 
 export function finishPuzzleDemoPartner(state:PuzzleState,now:number,selectedRoute?:PuzzleRoute):PuzzleState {
   const team=periodParticipation(state,weekendPeriod(now).id);
   if(!team||team.archived||team.members.length!==2||!periodOpen(team.period,now)||team.pieces.length>=3)return state;
-  const own=ownPieces(team),partner=team.members.find(member=>member.id!=='self');
+  const partner=team.members.find(member=>member.id!=='self');
   if(!partner||ownPieces(team,partner.id).length)return state;
-  const route=selectedRoute??(own.length===2?own[0].route:undefined);
+  const route=selectedRoute;
   if(!route)return state;
   return finishPuzzle(state,team.id,{
     id:'demo-partner-finish-'+team.id,memberId:partner.id,slot:team.pieces.length,route,
