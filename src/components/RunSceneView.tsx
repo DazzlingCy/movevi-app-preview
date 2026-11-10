@@ -64,40 +64,42 @@ export default function RunSceneView({ selection, onSelect, onClose }: Props) {
           <section className={styles.quickSection} aria-labelledby="run-scene-quick">
             <h2 id="run-scene-quick">常用场景</h2>
             <div className={styles.quick}>
-              <button className={styles.cityMode} type="button" aria-pressed={selection === null} onClick={() => onSelect(null)}>
-                <span className={styles.quickIcon}><GalleryHorizontalEnd size={22} strokeWidth={1.7} aria-hidden="true" /></span>
-                <span className={styles.quickCopy}><strong>城市卡片模式</strong><small>按城市浏览跑步路线</small></span>
-                {selection === null && <Check className={styles.quickCheck} size={15} aria-hidden="true" />}
+              <button className={styles.cityMode} type="button" aria-pressed={selection === null} aria-description="按城市浏览跑步路线" onClick={() => onSelect(null)}>
+                <GalleryHorizontalEnd size={20} strokeWidth={2} aria-hidden="true" />
+                <span>城市卡片模式</span>
+                {selection === null && <Check className={styles.quickCheck} size={16} aria-hidden="true" />}
               </button>
               {QUICK_RUN_SCENES.map(({ scene, hint }, index) => {
                 const Icon = quickIcons[index];
                 const active = selection === scene;
-                return <button key={scene.label} type="button" aria-pressed={active} onClick={() => onSelect(scene)}>
-                  <span className={styles.quickIcon}><Icon size={18} strokeWidth={1.7} aria-hidden="true" /></span>
-                  <span className={styles.quickCopy}><strong>{scene.label}</strong><small>{hint}</small></span>
-                  {active && <Check className={styles.quickCheck} size={15} aria-hidden="true" />}
+                return <button key={scene.label} type="button" aria-pressed={active} aria-description={hint} onClick={() => onSelect(scene)}>
+                  <Icon size={19} strokeWidth={2} aria-hidden="true" />
+                  <span>{scene.label}</span>
+                  {active && <Check className={styles.quickCheck} size={16} aria-hidden="true" />}
                 </button>;
               })}
             </div>
           </section>
-          {RUN_SCENE_GROUPS.map(group => {
-            const GroupIcon = groupIcons[group.id];
-            return <section key={group.id} className={styles.group} aria-labelledby={`run-scene-${group.id}`}>
-              <div className={styles.groupHeading}>
-                <GroupIcon size={15} strokeWidth={1.7} aria-hidden="true" />
-                <h2 id={`run-scene-${group.id}`}>{group.title}</h2>
-              </div>
-              <div className={styles.tags}>
-                {group.scenes.map(scene => {
-                  const Icon = sceneIcons[scene.symbol];
-                  return <button key={scene.label} type="button" aria-pressed={selection === scene} onClick={() => onSelect(scene)}>
-                    <Icon size={19} strokeWidth={1.65} aria-hidden="true" />
-                    <span>{scene.label}</span>
-                  </button>;
-                })}
-              </div>
-            </section>;
-          })}
+          <div className={styles.catalog}>
+            {RUN_SCENE_GROUPS.map(group => {
+              const GroupIcon = groupIcons[group.id];
+              return <section key={group.id} className={styles.group} aria-labelledby={`run-scene-${group.id}`}>
+                <div className={styles.groupHeading}>
+                  <GroupIcon size={14} strokeWidth={1.8} aria-hidden="true" />
+                  <h2 id={`run-scene-${group.id}`}>{group.title}</h2>
+                </div>
+                <div className={styles.tags}>
+                  {group.scenes.map(scene => {
+                    const Icon = sceneIcons[scene.symbol];
+                    return <button key={scene.label} type="button" aria-pressed={selection === scene} onClick={() => onSelect(scene)}>
+                      <Icon size={22} strokeWidth={1.9} aria-hidden="true" />
+                      <span>{scene.label}</span>
+                    </button>;
+                  })}
+                </div>
+              </section>;
+            })}
+          </div>
         </div>
       </div>
       <button className={styles.dismissArea} type="button" onClick={onClose} aria-label="收起跑步模式" />

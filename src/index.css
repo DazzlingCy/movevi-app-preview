@@ -1151,7 +1151,7 @@ body { background: var(--bg); }
 }
 .destination-card { height: auto; min-height: 0; border: 0; border-radius: 23px 23px 0 0; background: #111216; box-shadow: none; }
 .destination-card__photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.86) brightness(.64) contrast(1); transform: scale(1.015); }
-.destination-card__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 52%; opacity: 1; filter: saturate(.92) brightness(.64) contrast(1.04); transform: scale(1.025); transition: opacity .28s ease; }
+.destination-card__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 52%; opacity: 0; pointer-events: none; filter: saturate(.92) brightness(.64) contrast(1.04); transform: scale(1.025); transition: opacity .28s ease; }
 .destination-card__video.is-ready { opacity: 1; animation: destinationVideoReveal .42s ease both; }
 .page--home .destination-upcoming-card__status { left: 18px; right: auto; }
 .page--home:not(:has(.destination-carousel.is-browsing)) .destination-journey-card.is-active :is(.destination-card__video-play,.destination-upcoming-card__status,.destination-card__new) { top:calc(max(12px,env(safe-area-inset-top,0px)) + 56px); }

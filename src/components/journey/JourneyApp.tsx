@@ -296,9 +296,67 @@ function HomeQuickActions({ deviceConnected, onDevice, onLegacyFeature }: Pick<H
   );
 }
 
+function CityVideoPreview({ src }: { src: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [status, setStatus] = useState<'idle' | 'loading' | 'playing' | 'retry'>('idle');
+
+  useEffect(() => {
+    const video = videoRef.current;
+    return () => {
+      if (!video?.hasAttribute('src')) return;
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    };
+  }, []);
+
+  const togglePlayback = () => {
+    const video = videoRef.current;
+    if (!video || status === 'loading') return;
+    if (status === 'playing') {
+      video.pause();
+      setStatus('idle');
+      return;
+    }
+    if (video.error || !video.hasAttribute('src')) video.src = src;
+    setStatus('loading');
+    void video.play().catch(error => {
+      if (error.name !== 'AbortError') setStatus('retry');
+    });
+  };
+
+  return (
+    <>
+      <video
+        ref={videoRef}
+        className={`destination-card__video${status === 'playing' ? ' is-ready' : ''}`}
+        preload="none"
+        muted
+        loop
+        playsInline
+        crossOrigin="anonymous"
+        disablePictureInPicture
+        tabIndex={-1}
+        aria-hidden="true"
+        onPlaying={() => setStatus('playing')}
+        onError={() => setStatus('retry')}
+      />
+      <button
+        className="destination-card__video-play"
+        type="button"
+        aria-disabled={status === 'loading'}
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => { event.stopPropagation(); togglePlayback(); }}
+      >
+        {status === 'playing' ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+        {status === 'playing' ? '暂停城市动态' : status === 'loading' ? '加载中…' : status === 'retry' ? '重试城市动态' : '播放城市动态'}
+      </button>
+    </>
+  );
+}
+
 function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoalKm, allowGoalAnimation, onEditDailyGoal, city, deviceConnected, onRoutes, onRecommendations, onRunScenes, onBrowseCity, onSelectNextCity, focusNextStation, onNextStationFocused, onDevice, onLegacyFeature, onCarouselEnd }: HomePageProps) {
   const carouselRef = useRef<HTMLDivElement>(null);
-  const cityVideoRef = useRef<HTMLVideoElement>(null);
   const hasAlignedCarouselRef = useRef(false);
   const programmaticScrollRef = useRef(false);
   const carouselSettlerRef = useRef<ReturnType<typeof createCarouselSettler> | null>(null);
@@ -334,7 +392,6 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
     const horizontal = distance > Math.abs(start.y - y) * 1.4;
     if (start.atEnd && isAtCarouselEnd() && distance >= 48 && horizontal) notifyCarouselEnd();
   };
-  const [videoNeedsTap, setVideoNeedsTap] = useState(false);
   const featuredRecommendation = SHOW_DAILY_RECOMMENDATIONS ? recommendations[0] : undefined;
   const [candidateBatchIndex, setCandidateBatchIndex] = useState(0);
   const homeJourneyCities = getHomeJourneyCityIds(state).map(cityId => getJourneyCity(cityId)!).filter(Boolean);
@@ -663,58 +720,6 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
     if (!currentCityCompleted || candidateBatchCount <= 1) return;
     setCandidateBatchIndex(index => (index + 1) % candidateBatchCount);
   };
-  const playCityVideo = useCallback(() => {
-    const video = cityVideoRef.current;
-    if (!video) return;
-    video.muted = true;
-    void video.play()
-      .then(() => setVideoNeedsTap(false))
-      .catch(() => setVideoNeedsTap(true));
-  }, []);
-
-  useEffect(() => {
-    setVideoNeedsTap(false);
-    let cancelled = false;
-
-    const tryPlayback = () => {
-      if (cancelled || document.visibilityState === 'hidden') return;
-      const video = cityVideoRef.current;
-      if (!video || !video.paused) return;
-      video.muted = true;
-      void video.play()
-        .then(() => {
-          if (!cancelled) setVideoNeedsTap(false);
-        })
-        .catch(() => {
-          if (!cancelled) setVideoNeedsTap(true);
-        });
-    };
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') tryPlayback();
-    };
-    const handleUserActivation = () => tryPlayback();
-    const initialRetry = window.setTimeout(tryPlayback, 80);
-    const readinessRetry = window.setTimeout(tryPlayback, 650);
-    const fallbackTimer = window.setTimeout(() => {
-      if (!cancelled && cityVideoRef.current?.paused) setVideoNeedsTap(true);
-    }, 1200);
-
-    window.addEventListener('pageshow', tryPlayback);
-    document.addEventListener('visibilitychange', handleVisibility);
-    document.addEventListener('pointerdown', handleUserActivation, { capture: true });
-    document.addEventListener('touchstart', handleUserActivation, { capture: true, passive: true });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(initialRetry);
-      window.clearTimeout(readinessRetry);
-      window.clearTimeout(fallbackTimer);
-      window.removeEventListener('pageshow', tryPlayback);
-      document.removeEventListener('visibilitychange', handleVisibility);
-      document.removeEventListener('pointerdown', handleUserActivation, { capture: true });
-      document.removeEventListener('touchstart', handleUserActivation, { capture: true });
-    };
-  }, [city.id]);
 
   useEffect(() => {
     setCandidateBatchIndex(0);
@@ -780,9 +785,11 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
             }
           }}
         >
-          {homeJourneyCities.map((item) => {
+          {homeJourneyCities.map((item, index) => {
             const itemStatus = getCityStatus(state, item.id);
             const releaseDate = getCityRouteReleaseDate(item.id);
+            const coverPriority = index === cityIndex ? 'high' : Math.abs(index - cityIndex) === 1 ? 'auto' : 'low';
+            const coverLoading = coverPriority === 'low' ? 'lazy' : 'eager';
             if (!hasPublishedCityRoutes(item.id) && releaseDate) {
               return (
                 <section
@@ -793,7 +800,7 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
                   aria-label={`${item.name}，尚未开放，预计${releaseDate}开放`}
                   onClick={() => handleCityCardClick(item.id)}
                 >
-                  <img className="destination-upcoming-card__photo" src={cityImageFor(item)} alt="" aria-hidden="true" />
+                  <img className="destination-upcoming-card__photo" src={cityImageFor(item)} loading={coverLoading} fetchPriority={coverPriority} decoding="async" alt="" />
                   <span className="destination-upcoming-card__shade" aria-hidden="true" />
                   <span className="destination-upcoming-card__status"><Clock3 />尚未开放</span>
                   <div className="destination-upcoming-card__copy">
@@ -823,59 +830,8 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
               <Fragment key={item.id}>
                 <section className={`destination-journey-card${item.id === city.id ? ' is-active' : ' is-side'}`} data-city-id={item.id} key={item.id} style={cityStyle(item)} aria-label={`${item.name}，${itemLabel}${isNew ? '，新上线' : ''}`} onClick={() => handleCityCardClick(item.id)}>
                   <div className="destination-card">
-                    <img className="destination-card__photo" src={cityImageFor(item)} alt="" aria-hidden="true" />
-                    {itemStatus === 'current' && item.id === city.id && cityVideoFor(item) && (
-                      <>
-                        <video
-                          key={cityVideoFor(item)}
-                          ref={cityVideoRef}
-                          className="destination-card__video"
-                          src={cityVideoFor(item)}
-                          poster={cityImageFor(item)}
-                          autoPlay
-                          muted
-                          loop
-                          playsInline
-                          preload="auto"
-                          crossOrigin="anonymous"
-                          disablePictureInPicture
-                          tabIndex={-1}
-                          aria-hidden="true"
-                          onLoadedMetadata={event => {
-                            event.currentTarget.muted = true;
-                            void event.currentTarget.play().catch(() => setVideoNeedsTap(true));
-                          }}
-                          onLoadedData={event => {
-                            event.currentTarget.classList.add('is-ready');
-                            event.currentTarget.muted = true;
-                            void event.currentTarget.play().catch(() => setVideoNeedsTap(true));
-                          }}
-                          onCanPlay={event => {
-                            event.currentTarget.classList.add('is-ready');
-                            event.currentTarget.muted = true;
-                            void event.currentTarget.play().catch(() => setVideoNeedsTap(true));
-                          }}
-                          onPlaying={event => {
-                            event.currentTarget.classList.add('is-ready');
-                            setVideoNeedsTap(false);
-                          }}
-                          onError={event => {
-                            event.currentTarget.style.display = 'none';
-                            setVideoNeedsTap(false);
-                          }}
-                        />
-                        {videoNeedsTap && (
-                          <button
-                            className="destination-card__video-play"
-                            type="button"
-                            onPointerDown={event => event.stopPropagation()}
-                            onClick={event => { event.stopPropagation(); playCityVideo(); }}
-                          >
-                            <Play /> 播放城市动态
-                          </button>
-                        )}
-                      </>
-                    )}
+                    <img className="destination-card__photo" src={cityImageFor(item)} loading={coverLoading} fetchPriority={coverPriority} decoding="async" alt="" />
+                    {itemStatus === 'current' && item.id === city.id && <CityVideoPreview src={cityVideoFor(item)} />}
                     <div className="destination-card__overlay" />
                     {isNew && <span className="city-new-badge destination-card__new" aria-hidden="true">NEW</span>}
                     <div className={`destination-card__content ${homeRunStyles.coverContent}`}>
@@ -2017,15 +1973,6 @@ export default function JourneyApp() {
     if (routeSuggestionsOpen) setRouteCityId(null);
     if (routeSuggestionSource === 'scene') setRouteSuggestionSource(null);
   };
-  const canWarmRunScenery = !!activityRoute || !!(routeSheetCity && selectedRouteData && (
-    recommendationsOpen || (
-      ['current', 'completed'].includes(getCityStatus(state, routeSheetCity.id))
-      && getRouteStatus(state, routeSheetCity.id, selectedRouteData.id) !== 'locked'
-    )
-  ));
-  useEffect(() => {
-    if (canWarmRunScenery) prepareRunScenery();
-  }, [canWarmRunScenery, prepareRunScenery]);
   const lastRunCity = state.lastRun ? getJourneyCity(state.lastRun.cityId) : undefined;
   const lastRunRoute = state.lastRun ? getJourneyRoute(state.lastRun.cityId, state.lastRun.routeId) : undefined;
   const pendingCity = state.pendingNextCityId ? getJourneyCity(state.pendingNextCityId) : undefined;

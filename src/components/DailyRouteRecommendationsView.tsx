@@ -32,6 +32,7 @@ export default function DailyRouteRecommendationsView({ cityImageFor, day, scene
   }, [sceneName, scrollTop]);
 
   const isScene = sceneName !== undefined;
+  const priorityIndex = routeIndex ?? 0;
   const cards = recommendations.map(({ city, route }, index) => {
     const featured = isScene || index === 0;
     const category = getRouteCategory(city.name, route.order);
@@ -43,8 +44,8 @@ export default function DailyRouteRecommendationsView({ cityImageFor, day, scene
             src={resolveRecommendationCover(getRouteCover(city.name, route.order)?.src, featured ? 'feature' : 'thumbnail') ?? cityImageFor(city)}
             alt=""
             fallbackLabel={route.landmarks[0]}
-            loading={index < (isScene ? 2 : 3) ? 'eager' : 'lazy'}
-            fetchPriority={index === (routeIndex ?? 0) ? 'high' : 'low'}
+            loading={(isScene ? Math.abs(index - priorityIndex) <= 1 : index < 3) ? 'eager' : 'lazy'}
+            fetchPriority={index === priorityIndex ? 'high' : 'low'}
           />
         </span>
         {isScene ? (
