@@ -1,0 +1,95 @@
+.page {
+  --scene-base: var(--paper-2);
+  --scene-panel: var(--journey-surface);
+  --scene-ink: var(--ink);
+  --scene-muted: #aeb0be;
+  --scene-accent: var(--run-mode-accent);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(52px, 17%, 88px);
+  height: 100%;
+  color: var(--scene-ink);
+  touch-action: pan-y;
+}
+
+.dismissArea { min-width: 0; border: 0; background: linear-gradient(90deg, #090b0e82, #090b0e33); cursor: pointer; }
+.dismissArea:focus-visible { outline: 2px solid var(--scene-accent); outline-offset: -4px; }
+.panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  border-inline-end: 1px solid var(--line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--scene-accent) 7%, var(--scene-base)), var(--scene-base) 180px);
+}
+.header { padding: max(20px, env(safe-area-inset-top)) 16px 18px; }
+.header h1 { margin: 0; color: var(--scene-ink); font-size: 25px; font-weight: 700; line-height: 1.2; }
+.header p { margin: 4px 0 0; color: var(--scene-muted); font-size: 12px; line-height: 1.4; }
+.scroll { overflow: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 0 16px max(18px, env(safe-area-inset-bottom)); scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+.quickSection h2, .groupHeading h2 { margin: 0; color: var(--scene-ink); font-size: 13px; font-weight: 650; line-height: 1.4; }
+.quickSection h2 { margin: 0 0 8px 2px; }
+.quick { display: grid; gap: 6px; }
+.quick button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 7px 10px;
+  border: 1px solid #ffffff14;
+  border-radius: 12px;
+  background: var(--scene-panel);
+  color: inherit;
+  text-align: left;
+}
+.quickIcon { display: grid; flex: none; width: 32px; height: 32px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--scene-accent) 10%, transparent); color: var(--scene-accent); }
+.quickCopy { display: grid; flex: 1; gap: 2px; min-width: 0; line-height: 1.25; }
+.quickCopy strong { font-size: 13px; font-weight: 650; }
+.quickCopy small { color: var(--scene-muted); font-size: 11px; }
+.quickCheck { flex: none; color: var(--scene-accent); }
+.quick button[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--scene-accent) 56%, transparent);
+  background: color-mix(in srgb, var(--scene-accent) 14%, var(--scene-panel));
+}
+.quick button[aria-pressed='true'] .quickIcon { background: color-mix(in srgb, var(--scene-accent) 20%, transparent); }
+.quick .cityMode { min-height: 72px; gap: 12px; padding: 10px 12px; }
+.cityMode .quickIcon { width: 42px; height: 42px; border-radius: 10px; }
+.cityMode .quickCopy strong { font-size: 15px; }
+.cityMode .quickCopy small { font-size: 12px; }
+
+.group { margin-top: 20px; }
+.groupHeading { display: flex; align-items: center; gap: 7px; padding: 0 2px; margin-bottom: 8px; }
+.groupHeading svg { flex: none; color: var(--scene-accent); }
+.tags { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 4px; border: 1px solid #ffffff0e; border-radius: 12px; background: var(--scene-panel); }
+.tags button {
+  display: grid;
+  grid-template-rows: 20px minmax(29px, auto);
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 62px;
+  padding: 5px 3px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--scene-ink);
+  text-align: center;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.tags button svg { align-self: center; color: var(--scene-muted); }
+.tags button span {
+  align-self: center;
+  max-inline-size: 6em;
+  text-wrap: balance;
+}
+.tags button[aria-pressed='true'] { background: var(--scene-accent); color: var(--run-mode-accent-ink); font-weight: 650; }
+.tags button[aria-pressed='true'] svg { color: inherit; }
+@media (hover: hover) {
+  .quick button:not([aria-pressed='true']):hover, .tags button:not([aria-pressed='true']):hover { background: color-mix(in srgb, var(--scene-accent) 9%, var(--scene-panel)); }
+}
+.quick button:focus-visible, .tags button:focus-visible { outline: 2px solid var(--scene-accent); outline-offset: 2px; }
+.quick button:active, .tags button:active { opacity: .78; }
