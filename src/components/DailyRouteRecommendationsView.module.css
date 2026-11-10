@@ -193,7 +193,12 @@
   white-space: normal;
   text-wrap: balance;
 }
-.sceneRail .routeType { background: color-mix(in srgb, var(--run-mode-accent) 85%, white); color: var(--run-mode-accent-ink); }
+.sceneRail .sceneType {
+  grid-area: kicker;
+  place-self: start;
+  background: color-mix(in srgb, var(--run-mode-accent) 85%, white);
+  color: var(--run-mode-accent-ink);
+}
 .sceneRail .action { background: var(--run-mode-accent); color: var(--run-mode-accent-ink); cursor: pointer; }
 .sceneRail .route:hover .action, .sceneRail .route:active .action { background: color-mix(in srgb, var(--run-mode-accent) 75%, white); }
 

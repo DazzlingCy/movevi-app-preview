@@ -34,6 +34,7 @@ export default function DailyRouteRecommendationsView({ cityImageFor, day, scene
   const isScene = sceneName !== undefined;
   const cards = recommendations.map(({ city, route }, index) => {
     const featured = isScene || index === 0;
+    const category = getRouteCategory(city.name, route.order);
     return (
       <button type="button" className={`${styles.route}${featured ? ` ${styles.featured}` : ''}`} onClick={() => onRouteClick(route, isScene ? index : (pageRef.current?.scrollTop ?? 0))}>
         <span className={styles.cover}>
@@ -46,11 +47,13 @@ export default function DailyRouteRecommendationsView({ cityImageFor, day, scene
             fetchPriority={index === (routeIndex ?? 0) ? 'high' : 'low'}
           />
         </span>
-        {!isScene && index === 0 && <span className={styles.kicker}>今日精选</span>}
+        {isScene ? (
+          <span className={`${styles.routeType} ${styles.sceneType}`}>{category}</span>
+        ) : index === 0 && <span className={styles.kicker}>今日精选</span>}
         <span className={styles.routeBody}>
           <span className={styles.routeMeta}>
             {city.name}
-            <span className={styles.routeType}>{getRouteCategory(city.name, route.order)}</span>
+            {!isScene && <span className={styles.routeType}>{category}</span>}
           </span>
           <strong>{isScene ? route.name.replace('·', '') : route.name}</strong>
           {featured && <span className={styles.landmarks}>{route.landmarks.join(' · ')}</span>}
