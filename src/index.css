@@ -1154,11 +1154,8 @@ body { background: var(--bg); }
 .destination-card__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 52%; opacity: 0; pointer-events: none; filter: saturate(.92) brightness(.64) contrast(1.04); transform: scale(1.025); transition: opacity .28s ease; }
 .destination-card__video.is-ready { opacity: 1; animation: destinationVideoReveal .42s ease both; }
 .page--home .destination-upcoming-card__status { left: 18px; right: auto; }
-.page--home:not(:has(.destination-carousel.is-browsing)) .destination-journey-card.is-active :is(.destination-card__video-play,.destination-upcoming-card__status,.destination-card__new) { top:calc(max(12px,env(safe-area-inset-top,0px)) + 56px); }
+.page--home:not(:has(.destination-carousel.is-browsing)) .destination-journey-card.is-active :is(.destination-upcoming-card__status,.destination-card__new) { top:calc(max(12px,env(safe-area-inset-top,0px)) + 56px); }
 .destination-card__new { z-index:3; top:14px; right:14px; padding:2px 7px; font-size:10px; line-height:14px; }
-.destination-card__video-play { position: absolute; z-index: 4; top: 15px; left: 15px; min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; background: rgba(5,7,12,.66); box-shadow: 0 8px 22px rgba(0,0,0,.24); backdrop-filter: blur(12px); color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; }
-.destination-card__video-play svg { width: 13px; height: 13px; fill: currentColor; }
-.destination-card__video-play:active { transform: scale(.97); }
 .destination-card__overlay {
   background:
     linear-gradient(180deg, rgba(3,4,7,.02) 0%, rgba(3,4,7,.16) 42%, #13141b 100%),

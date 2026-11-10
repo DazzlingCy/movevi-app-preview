@@ -298,59 +298,63 @@ function HomeQuickActions({ deviceConnected, onDevice, onLegacyFeature }: Pick<H
 
 function CityVideoPreview({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'playing' | 'retry'>('idle');
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
+    if (!video) return;
+    const frame = requestAnimationFrame(() => {
+      video.muted = true;
+      video.src = src;
+    });
     return () => {
-      if (!video?.hasAttribute('src')) return;
+      cancelAnimationFrame(frame);
+      if (!video.hasAttribute('src')) return;
       video.pause();
       video.removeAttribute('src');
       video.load();
     };
-  }, []);
+  }, [src]);
 
-  const togglePlayback = () => {
-    const video = videoRef.current;
-    if (!video || status === 'loading') return;
-    if (status === 'playing') {
-      video.pause();
-      setStatus('idle');
-      return;
-    }
-    if (video.error || !video.hasAttribute('src')) video.src = src;
-    setStatus('loading');
-    void video.play().catch(error => {
-      if (error.name !== 'AbortError') setStatus('retry');
-    });
-  };
+  return (
+    <video
+      ref={videoRef}
+      className={`destination-card__video${playing ? ' is-ready' : ''}`}
+      autoPlay
+      muted
+      loop
+      playsInline
+      crossOrigin="anonymous"
+      disablePictureInPicture
+      tabIndex={-1}
+      aria-hidden="true"
+      onPlaying={() => setPlaying(true)}
+      onError={() => setPlaying(false)}
+    />
+  );
+}
+
+function HomeCityCover({ image, loading, priority, video }: {
+  image: string;
+  loading: 'lazy' | 'eager';
+  priority: 'high' | 'auto' | 'low';
+  video?: string;
+}) {
+  const [imageSettled, setImageSettled] = useState(false);
 
   return (
     <>
-      <video
-        ref={videoRef}
-        className={`destination-card__video${status === 'playing' ? ' is-ready' : ''}`}
-        preload="none"
-        muted
-        loop
-        playsInline
-        crossOrigin="anonymous"
-        disablePictureInPicture
-        tabIndex={-1}
-        aria-hidden="true"
-        onPlaying={() => setStatus('playing')}
-        onError={() => setStatus('retry')}
+      <img
+        className="destination-card__photo"
+        src={image}
+        loading={loading}
+        fetchPriority={priority}
+        decoding="async"
+        alt=""
+        onLoad={() => setImageSettled(true)}
+        onError={() => setImageSettled(true)}
       />
-      <button
-        className="destination-card__video-play"
-        type="button"
-        aria-disabled={status === 'loading'}
-        onPointerDown={event => event.stopPropagation()}
-        onClick={event => { event.stopPropagation(); togglePlayback(); }}
-      >
-        {status === 'playing' ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
-        {status === 'playing' ? '暂停城市动态' : status === 'loading' ? '加载中…' : status === 'retry' ? '重试城市动态' : '播放城市动态'}
-      </button>
+      {imageSettled && video && <CityVideoPreview src={video} />}
     </>
   );
 }
@@ -830,8 +834,12 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
               <Fragment key={item.id}>
                 <section className={`destination-journey-card${item.id === city.id ? ' is-active' : ' is-side'}`} data-city-id={item.id} key={item.id} style={cityStyle(item)} aria-label={`${item.name}，${itemLabel}${isNew ? '，新上线' : ''}`} onClick={() => handleCityCardClick(item.id)}>
                   <div className="destination-card">
-                    <img className="destination-card__photo" src={cityImageFor(item)} loading={coverLoading} fetchPriority={coverPriority} decoding="async" alt="" />
-                    {itemStatus === 'current' && item.id === city.id && <CityVideoPreview src={cityVideoFor(item)} />}
+                    <HomeCityCover
+                      image={cityImageFor(item)}
+                      loading={coverLoading}
+                      priority={coverPriority}
+                      video={itemStatus === 'current' && item.id === city.id ? cityVideoFor(item) : undefined}
+                    />
                     <div className="destination-card__overlay" />
                     {isNew && <span className="city-new-badge destination-card__new" aria-hidden="true">NEW</span>}
                     <div className={`destination-card__content ${homeRunStyles.coverContent}`}>
