@@ -39,6 +39,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Keep repository media outside the Pages artifact
+        run: rm -rf dist/video
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
