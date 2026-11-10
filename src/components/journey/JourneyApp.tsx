@@ -259,6 +259,21 @@ function HomeRunModeButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+function HomeCityListButton({ hasNewCity, label = '浏览城市列表', controls, onPointerDown, onClick }: {
+  hasNewCity: boolean;
+  label?: string;
+  controls?: string;
+  onPointerDown?: (event: PointerEvent<HTMLButtonElement>) => void;
+  onClick: () => void;
+}) {
+  return (
+    <button className="home-city-list-entry" type="button" aria-label={label} aria-description={hasNewCity ? '有新开放的城市' : undefined} aria-controls={controls} onPointerDown={onPointerDown} onClick={onClick}>
+      <GalleryHorizontalEnd aria-hidden="true" /><span>城市列表</span>
+      {hasNewCity && <span className="city-new-badge home-city-list-entry__new" aria-hidden="true">NEW</span>}
+    </button>
+  );
+}
+
 function HomeQuickActions({ deviceConnected, onDevice, onLegacyFeature }: Pick<HomePageProps, 'deviceConnected' | 'onDevice' | 'onLegacyFeature'>) {
   return (
     <nav className="home-quick-actions" aria-label="首页快捷入口">
@@ -282,7 +297,6 @@ function HomeQuickActions({ deviceConnected, onDevice, onLegacyFeature }: Pick<H
 }
 
 function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoalKm, allowGoalAnimation, onEditDailyGoal, city, deviceConnected, onRoutes, onRecommendations, onRunScenes, onBrowseCity, onSelectNextCity, focusNextStation, onNextStationFocused, onDevice, onLegacyFeature, onCarouselEnd }: HomePageProps) {
-  const hasNewCity = newCityIds.length > 0;
   const carouselRef = useRef<HTMLDivElement>(null);
   const cityVideoRef = useRef<HTMLVideoElement>(null);
   const hasAlignedCarouselRef = useRef(false);
@@ -713,13 +727,10 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
           <h1>今天跑哪里？</h1>
           <div className="home-destination-actions">
             <HomeRunModeButton onClick={onRunScenes} />
-            <button className="home-city-list-entry" type="button" aria-label="浏览城市列表" aria-description={hasNewCity ? '有新开放的城市' : undefined} aria-controls="home-city-carousel" onPointerDown={handleCtaPointerDown} onClick={() => {
+            <HomeCityListButton hasNewCity={newCityIds.length > 0} controls="home-city-carousel" onPointerDown={handleCtaPointerDown} onClick={() => {
               scheduleNearestCitySelection();
               carouselRef.current?.focus({ preventScroll: true });
-            }}>
-              <GalleryHorizontalEnd aria-hidden="true"/><span>城市列表</span>
-              {hasNewCity && <span className="city-new-badge home-city-list-entry__new" aria-hidden="true">NEW</span>}
-            </button>
+            }} />
           </div>
         </div>
         <HomeQuickActions deviceConnected={deviceConnected} onDevice={onDevice} onLegacyFeature={onLegacyFeature} />
@@ -2072,7 +2083,10 @@ export default function JourneyApp() {
                 cityImageFor={cityImageFor}
                 sceneName={selectedScene.label}
                 homeControls={<>
-                  <HomeRunModeButton onClick={openRunScenes} />
+                  <div className="home-destination-actions">
+                    <HomeRunModeButton onClick={openRunScenes} />
+                    <HomeCityListButton hasNewCity={newCityIds.length > 0} label="城市列表，切回城市卡片模式" onClick={() => selectRunScene(null)} />
+                  </div>
                   <HomeQuickActions deviceConnected={deviceConnected} onDevice={() => setUtilityMode('device')} onLegacyFeature={openLegacyFeature} />
                 </>}
                 recommendations={getSceneRoutes(selectedScene, state)}
