@@ -21,12 +21,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore preview videos
-        run: |
-          mkdir -p public/video/routes
-          cat public/video/routes/chunks/hangzhou-city-demo.mp4.part-* > public/video/routes/hangzhou-city-demo.mp4
-          cat public/video/routes/chunks/hangzhou-city-fast.mp4.part-* > public/video/routes/hangzhou-city-fast.mp4
-          rm -rf public/video/routes/chunks
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
