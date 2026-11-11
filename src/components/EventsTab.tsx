@@ -160,7 +160,7 @@ export default function EventsTab({
   return (
     <div className="relative h-full w-full overflow-y-auto bg-[#05070A] pb-24 font-sans text-slate-100 hide-scrollbar">
       <div className="sticky top-0 z-20 flex items-center justify-center border-b border-white/10 bg-black/40 p-3.5 pt-safeb backdrop-blur-md">
-        <h1 className="text-sm font-bold uppercase tracking-widest text-cyan-400">热门活动</h1>
+        <h1 className="text-sm font-bold uppercase tracking-widest text-cyan-400">福利</h1>
       </div>
 
       <div className="flex flex-col gap-3.5 p-3.5">

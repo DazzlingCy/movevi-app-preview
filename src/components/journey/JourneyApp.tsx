@@ -1569,7 +1569,7 @@ function BottomNavigation({ active, onChange }: { active: PrimaryTab; onChange: 
   const items = [
     { id: 'home' as const, label: '首页', icon: Compass },
     { id: 'world' as const, label: '世界', icon: Globe2 },
-    { id: 'activity' as const, label: '活动', icon: CalendarDays },
+    { id: 'activity' as const, label: '福利', icon: CalendarDays },
     { id: 'profile' as const, label: '我的', icon: UserRound }
   ];
   return (
