@@ -40,7 +40,9 @@ jobs:
         run: npm run build
 
       - name: Keep repository media outside the Pages artifact
-        run: rm -rf dist/video dist/images/cities dist/images/recommendations
+        run: |
+          rm -rf dist/video
+          find dist/images -mindepth 1 -maxdepth 1 ! -name welfare -exec rm -rf {} +
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
