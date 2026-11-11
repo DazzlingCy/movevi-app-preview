@@ -2,7 +2,7 @@ import { LOCAL_IMAGE_MANIFEST } from '../data/localImageManifest';
 
 const appEnv = (import.meta as ImportMeta & { env?: { BASE_URL?: string; PROD?: boolean } }).env;
 const appBase = appEnv?.BASE_URL ?? './';
-const previewMediaBase = 'https://cdn.jsdelivr.net/gh/DazzlingCy/movevi-app-preview@9fb29f21636ca2e1f58c5034d9e9c29994e39ca6/public/';
+const previewMediaBase = 'https://cdn.jsdelivr.net/gh/DazzlingCy/movevi-app-preview@7253ac6b3913518161a2bc7656267722883c610b/public/';
 const mediaBase = appEnv?.PROD ? previewMediaBase : appBase;
 
 /** Keep backend/custom images untouched; pre-packaged defaults use the app's own origin. */
@@ -12,13 +12,28 @@ export function resolveLocalImage(src: string | undefined, base = mediaBase): st
   return localPath ? `${base.endsWith('/') ? base : `${base}/`}${localPath}` : src;
 }
 
-/** Recommendation variants are generated from the vendored route covers. */
-export function recommendationCoverPath(localPath: string, size: 'feature' | 'thumbnail'): string {
-  const name = localPath.slice(localPath.lastIndexOf('/') + 1, localPath.lastIndexOf('.'));
-  return `images/recommendations/${size}/${name}.webp`;
+type RouteCoverSize = 'feature' | 'thumbnail' | 'list';
+type CityCoverSize = 'cover' | 'grid';
+
+function coverName(localPath: string) {
+  return localPath.slice(localPath.lastIndexOf('/') + 1, localPath.lastIndexOf('.'));
 }
 
-export function resolveRecommendationCover(src: string | undefined, size: 'feature' | 'thumbnail'): string | undefined {
+/** Route variants are generated from the vendored route covers. */
+export function recommendationCoverPath(localPath: string, size: RouteCoverSize): string {
+  return `images/recommendations/${size}/${coverName(localPath)}.webp`;
+}
+
+export function resolveRecommendationCover(src: string | undefined, size: RouteCoverSize): string | undefined {
   const localPath = src && LOCAL_IMAGE_MANIFEST[src];
   return localPath ? `${mediaBase}${recommendationCoverPath(localPath, size)}` : src;
+}
+
+export function cityCoverPath(localPath: string, size: CityCoverSize): string {
+  return `images/cities/${size}/${coverName(localPath)}.webp`;
+}
+
+export function resolveCityCover(src: string, size: CityCoverSize): string {
+  const localPath = LOCAL_IMAGE_MANIFEST[src];
+  return localPath ? `${mediaBase}${cityCoverPath(localPath, size)}` : src;
 }
