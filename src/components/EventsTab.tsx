@@ -1,224 +1,351 @@
-import { motion } from 'motion/react';
-import type { ReactNode } from 'react';
-import { Calendar, ChevronRight, Flame, Gift, Globe2, MessageSquare, Sparkles, Users } from 'lucide-react';
-import { resolveLocalImage } from '../lib/localImages';
-import { FIRST_CITY_TOTAL_CENTS } from '../journey/firstCityRewards';
+import { useId, useRef, useState, type CSSProperties } from 'react';
+import { Check, ChevronLeft, ChevronRight, Coins, Footprints, Gift, Globe2, Route, Users, Wallet, X } from 'lucide-react';
+import { DAILY_COIN_CAP, MILEAGE_REWARDS, ROUTE_REWARDS, STARTER_COIN_REWARDS, WITHDRAWAL_TIERS, formatCoinValue, parseWithdrawalCoins, type CoinEntry, type CoinTrack, type WithdrawalTier } from '../journey/coinRewards';
+import type { useCoinRewards } from '../journey/useCoinRewards';
+import Modal from './journey/Modal';
+import styles from './EventsTab.module.css';
 
 interface EventsTabProps {
-  onSelectMedley?: () => void;
-  onSelectMedalLottery?: () => void;
-  onSelectFirstCityRewards?: () => void;
-  onSelectTeamRelay?: () => void;
-  onSelectHundredCities?: () => void;
+  rewards: ReturnType<typeof useCoinRewards>;
+  onRun: () => void;
+  onSelectMedalLottery: () => void;
+  onSelectTeamRelay: () => void;
+  onSelectHundredCities: () => void;
 }
 
-type EventCardProps = {
-  title: string;
-  description: string;
-  image: string;
-  accent: 'amber' | 'emerald' | 'purple' | 'cyan' | 'rose';
-  icon: ReactNode;
-  tag: ReactNode;
-  onClick?: () => void;
-  className?: string;
-  delay?: number;
-  taller?: boolean;
-};
+const numberFormat = new Intl.NumberFormat('zh-CN');
+const entryDate = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+const trackNames = { mileage: '累计运动里程', route: '路线通关' };
+const historyTabs = { history: '金币记录', cashHistory: '现金记录' } as const;
+type HistoryTab = keyof typeof historyTabs;
+const fallingCoins = [
+  { x: 5, drift: -16, delay: 40, size: 19, tilt: -24 },
+  { x: 16, drift: -14, delay: 185, size: 12, tilt: 38 },
+  { x: 26, drift: -25, delay: 0, size: 17, tilt: -28 },
+  { x: 45, drift: -27, delay: 125, size: 13, tilt: 22 },
+  { x: 60, drift: 20, delay: 65, size: 15, tilt: -34 },
+  { x: 75, drift: 19, delay: 245, size: 16, tilt: 24 },
+  { x: 84, drift: 18, delay: 45, size: 19, tilt: 35 },
+  { x: 94, drift: 10, delay: 170, size: 12, tilt: -38 },
+];
 
-const accentStyles = {
-  amber: {
-    border: 'border-amber-500/30',
-    overlay: 'from-black via-black/60 to-amber-900/20',
-    glow: 'from-amber-500/20 to-transparent',
-    badge: 'bg-amber-500/20 text-amber-200 border-amber-500/50',
-    iconBox: 'bg-amber-500/20 border-amber-500/30',
-    iconText: 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]',
-    title: 'text-amber-100',
-    copy: 'text-amber-200/60',
-    action: 'bg-amber-500/20 hover:bg-amber-500/25 border-amber-500/40 text-amber-200',
-    arrow: 'bg-amber-500/10 border-amber-500/30 group-hover:bg-amber-500/30 text-amber-200'
-  },
-  emerald: {
-    border: 'border-emerald-500/30',
-    overlay: 'from-black via-black/70 to-emerald-900/20',
-    glow: 'from-emerald-500/20 to-transparent',
-    badge: 'bg-emerald-500/30 text-[#a1f2da] border-emerald-500/50',
-    iconBox: 'bg-emerald-500/20 border-emerald-500/30',
-    iconText: 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]',
-    title: 'text-emerald-100',
-    copy: 'text-emerald-200/60',
-    action: 'bg-emerald-500/20 hover:bg-emerald-500/25 border-emerald-500/40 text-[#a2dfcb]',
-    arrow: 'bg-emerald-500/10 border-emerald-500/30 group-hover:bg-emerald-500/30 text-emerald-200'
-  },
-  purple: {
-    border: 'border-purple-500/30',
-    overlay: 'from-black via-black/60 to-purple-900/20',
-    glow: 'from-purple-500/20 to-transparent',
-    badge: 'bg-purple-500/20 text-purple-200 border-purple-500/50',
-    iconBox: 'bg-purple-500/20 border-purple-500/30',
-    iconText: 'text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]',
-    title: 'text-purple-100',
-    copy: 'text-purple-200/60',
-    action: 'bg-purple-500/20 hover:bg-purple-500/25 border-purple-500/40 text-purple-200',
-    arrow: 'bg-purple-500/10 border-purple-500/30 group-hover:bg-purple-500/30 text-purple-200'
-  },
-  cyan: {
-    border: 'border-cyan-500/30',
-    overlay: 'from-black via-black/65 to-cyan-900/20',
-    glow: 'from-cyan-500/20 to-transparent',
-    badge: 'bg-cyan-500/20 text-cyan-200 border-cyan-500/50',
-    iconBox: 'bg-cyan-500/20 border-cyan-500/30',
-    iconText: 'text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]',
-    title: 'text-cyan-100',
-    copy: 'text-cyan-200/60',
-    action: 'bg-cyan-500/20 hover:bg-cyan-500/25 border-cyan-500/40 text-cyan-200',
-    arrow: 'bg-cyan-500/10 border-cyan-500/30 group-hover:bg-cyan-500/30 text-cyan-200'
-  },
-  rose: {
-    border: 'border-rose-400/30',
-    overlay: 'from-black via-black/70 to-rose-950/20',
-    glow: 'from-orange-400/20 via-transparent to-rose-500/10',
-    badge: 'bg-rose-400/20 text-rose-100 border-rose-300/40',
-    iconBox: 'bg-orange-400/20 border-orange-300/30',
-    iconText: 'text-orange-300 drop-shadow-[0_0_8px_rgba(251,146,60,0.8)]',
-    title: 'text-orange-50',
-    copy: 'text-orange-100/65',
-    action: 'bg-orange-400/20 border-orange-300/30 text-orange-100',
-    arrow: 'bg-orange-400/10 border-orange-300/30 group-hover:bg-orange-400/25 text-orange-100'
-  }
-};
-
-function EventCard({
-  title,
-  description,
-  image,
-  accent,
-  icon,
-  tag,
-  onClick,
-  className = '',
-  delay = 0,
-  taller = false
-}: EventCardProps) {
-  const styles = accentStyles[accent];
-
+function RewardMilestones({ tiers, value, track, starterClaimed, onClaim }: {
+  tiers: readonly { goal: number; coins: number }[];
+  value: number;
+  track: CoinTrack;
+  starterClaimed: boolean;
+  onClaim: () => void;
+}) {
+  const current = tiers.findIndex((tier, index) => value < tier.goal && !(index === 0 && starterClaimed));
   return (
-    <motion.button
-      type="button"
-      whileTap={{ scale: 0.98 }}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
-      onClick={onClick}
-      aria-label={`查看${title}`}
-      className={`relative w-full text-left ${taller ? 'h-[200px]' : 'h-[170px]'} rounded-2xl overflow-hidden shadow-2xl cursor-pointer group border ${styles.border} ${className}`}
-    >
-      <img
-        src={image}
-        alt={title}
-        className="absolute inset-0 h-full w-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-105"
-      />
-      <div className={`absolute inset-0 bg-gradient-to-t ${styles.overlay} mix-blend-multiply`} />
-      <div className={`absolute inset-0 bg-gradient-to-br ${styles.glow} pointer-events-none`} />
-
-      <div className={`absolute right-3 top-3 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest shadow-lg backdrop-blur-sm ${styles.badge}`}>
-        {tag}
-      </div>
-
-      <div className="absolute inset-x-0 bottom-0 p-3.5">
-        <div className={`mb-2 flex h-8 w-8 items-center justify-center rounded-lg border shadow-inner backdrop-blur-md ${styles.iconBox} ${styles.iconText}`}>
-          {icon}
-        </div>
-        <h2 className={`mb-0.5 text-base font-bold tracking-wide ${styles.title}`}>{title}</h2>
-        <div className="flex items-center justify-between gap-3">
-          <p className={`max-w-[66%] text-[11px] leading-relaxed line-clamp-2 ${styles.copy}`}>{description}</p>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span
-              aria-hidden="true"
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-lg ${styles.action}`}
-            >
-              <MessageSquare size={11} />
-              讨论
-            </span>
-            <div className={`flex h-7 w-7 items-center justify-center rounded-full border backdrop-blur transition-colors ${styles.arrow}`}>
-              <ChevronRight size={14} />
-            </div>
-          </div>
-        </div>
-      </div>
-    </motion.button>
+    <ol className={styles.milestones} data-kind={track}>
+      {tiers.map((tier, index) => {
+        const reached = value >= tier.goal || (index === 0 && starterClaimed);
+        const claimable = index === 0 && !reached;
+        const goal = track === 'route' ? `第 ${tier.goal} 条` : `${tier.goal} km`;
+        const tileContent = (
+          <>
+            <span className={styles.tierCoins}>+{tier.coins}<span className={styles.srOnly}> 金币{reached ? '，已入账' : ''}</span></span>
+            {track === 'mileage' ? <span className={styles.coinStack} aria-hidden="true">✦</span>
+              : <span className={styles.envelopeSeal} aria-hidden="true">✦</span>}
+            {(claimable || reached) && (
+              <span className={styles.rewardStatus} aria-hidden="true">
+                {reached ? <><Check size={10} strokeWidth={2.5} />已领取</> : '领取'}
+              </span>
+            )}
+          </>
+        );
+        return (
+          <li key={tier.goal} data-reached={reached} data-claimable={claimable} aria-current={index === current ? 'step' : undefined}>
+            {claimable ? <button type="button" className={styles.rewardTile} aria-label={`领取${trackNames[track]} ${goal} 奖励，${tier.coins} 金币`} onClick={onClaim}>{tileContent}</button>
+              : <span className={styles.rewardTile}>{tileContent}</span>}
+            <span className={styles.tierGoal}>{goal}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
-export default function EventsTab({
-  onSelectMedley,
-  onSelectMedalLottery,
-  onSelectFirstCityRewards,
-  onSelectTeamRelay,
-  onSelectHundredCities
-}: EventsTabProps) {
+function RewardHistory({ ledger, showCash, showExamples }: { ledger: CoinEntry[]; showCash: boolean; showExamples: boolean }) {
+  const entries = ledger.filter(entry => entry.kind !== 'exercise' || entry.reward.mileage + entry.reward.route > 0)
+    .sort((a, b) => b.at - a.at);
+  const formatAmount = (coins: number) => showCash ? formatCoinValue(coins) : `${numberFormat.format(coins)} 金币`;
+  if (!entries.length && showExamples) {
+    return (
+      <ul className={styles.history}>
+        {(['mileage', 'route'] as const).map((track, index) => (
+          <li key={track}>
+            <div><strong>{trackNames[track]}奖励</strong><small>{entryDate.format(Date.now() - index * 86_400_000)} · 示例记录</small></div>
+            <b>+{formatAmount(STARTER_COIN_REWARDS[track].coins)}</b>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  if (!entries.length) return <p className={styles.empty}>完成有效运动后，奖励明细会显示在这里。</p>;
   return (
-    <div className="relative h-full w-full overflow-y-auto bg-[#05070A] pb-24 font-sans text-slate-100 hide-scrollbar">
-      <div className="sticky top-0 z-20 flex items-center justify-center border-b border-white/10 bg-black/40 p-3.5 pt-safeb backdrop-blur-md">
-        <h1 className="text-sm font-bold uppercase tracking-widest text-cyan-400">福利</h1>
-      </div>
+    <ul className={styles.history}>
+      {entries.map(entry => {
+        const coins = entry.kind === 'exercise' ? entry.reward.mileage + entry.reward.route : entry.coins;
+        const amount = formatAmount(coins);
+        return (
+          <li key={entry.id}>
+            <div>
+              <strong>{entry.kind === 'starter-claim' ? `${trackNames[entry.track]}奖励`
+                : entry.kind === 'exercise' ? entry.routeName : entry.kind === 'withdrawal' ? '模拟提现' : '演示余额'}</strong>
+              <small>{entryDate.format(entry.at)}</small>
+              {entry.kind === 'exercise' && !showCash && <small>里程 +{entry.reward.mileage} · 通关 +{entry.reward.route}</small>}
+            </div>
+            <b>{entry.kind === 'withdrawal' ? '−' : '+'}{amount}</b>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
-      <div className="flex flex-col gap-3.5 p-3.5">
-        <EventCard
-          title="勋章盲盒抽奖"
-          description="消耗勋章，解锁全球城市路线，获取专属勋章抽取现金奖励。"
-          image="https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&q=80&w=600&h=400"
-          accent="amber"
-          icon={<Gift size={16} />}
-          tag={<span className="flex items-center gap-1"><Sparkles size={10} className="animate-pulse" />每日开放</span>}
-          onClick={onSelectMedalLottery}
-        />
+export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSelectTeamRelay, onSelectHundredCities }: EventsTabProps) {
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [historyTab, setHistoryTab] = useState<HistoryTab | null>(null);
+  const [earningsOpen, setEarningsOpen] = useState(false);
+  const [tier, setTier] = useState<WithdrawalTier | 'custom'>(1);
+  const [customAmount, setCustomAmount] = useState('');
+  const [notice, setNotice] = useState('');
+  const [compact, setCompact] = useState(false);
+  const [claimedTrack, setClaimedTrack] = useState<CoinTrack | null>(null);
+  const [claimError, setClaimError] = useState('');
+  const claiming = useRef(false);
+  const tasksHeading = useRef<HTMLHeadingElement>(null);
+  const withdrawalId = useRef<string | null>(null);
+  const earningsTrigger = useRef<HTMLElement | null>(null);
+  const historyTrigger = useRef<HTMLElement | null>(null);
+  const [withdrawn, setWithdrawn] = useState(false);
+  const headingId = useId();
+  const activities = [
+    { name: '勋章盲盒抽奖', description: '用盲盒券兑换抽奖机会', action: '去看看', icon: Gift, theme: 'gold', select: onSelectMedalLottery },
+    { name: '环球搭子小队', description: '双人组队，完成城市路线', action: '去组队', icon: Users, theme: 'mint', select: onSelectTeamRelay },
+    { name: '百人百城计划', description: '活动筹备中', action: '查看', icon: Globe2, theme: 'violet', select: onSelectHundredCities },
+  ];
+  const routeCount = Math.min(rewards.today.routes.size, ROUTE_REWARDS.length);
+  const amount = tier === 'custom' ? customAmount : tier;
+  const withdrawalCoins = parseWithdrawalCoins(amount);
+  const canWithdraw = rewards.demo && !withdrawn && withdrawalCoins !== null && rewards.balance >= withdrawalCoins;
+  const invalidAmount = tier === 'custom' && customAmount.trim() !== '' && withdrawalCoins === null;
+  const insufficientBalance = !withdrawn && withdrawalCoins !== null && withdrawalCoins > rewards.balance;
+  const demoCreditLoaded = rewards.ledger.some(entry => entry.kind === 'demo-credit');
+  const claimStarter = async (track: CoinTrack) => {
+    if (claiming.current) return;
+    claiming.current = true;
+    setClaimError('');
+    try {
+      if (await rewards.claimStarter(track)) {
+        setClaimedTrack(track);
+        return;
+      }
+      setClaimError('暂时无法领取，请刷新后重试。');
+    } catch {
+      setClaimError('暂时无法领取，请刷新后重试。');
+    } finally {
+      claiming.current = false;
+    }
+  };
+  const closeClaim = () => {
+    setClaimedTrack(null);
+    requestAnimationFrame(() => tasksHeading.current?.focus({ preventScroll: true }));
+  };
+  const openEarnings = () => {
+    earningsTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    withdrawalId.current = null;
+    setTier(1);
+    setCustomAmount('');
+    setWithdrawn(false);
+    setNotice('');
+    setEarningsOpen(true);
+  };
+  const closeEarnings = () => {
+    setEarningsOpen(false);
+    requestAnimationFrame(() => earningsTrigger.current?.focus({ preventScroll: true }));
+  };
+  const submitWithdrawal = () => {
+    if (!canWithdraw || withdrawalCoins === null) return;
+    const id = withdrawalId.current ??= `withdraw-${crypto.getRandomValues(new Uint32Array(4)).join('-')}`;
+    if (rewards.withdraw(amount, id)) {
+      setWithdrawn(true);
+      setNotice(`已记录模拟提现 ${formatCoinValue(withdrawalCoins)} 至微信钱包。`);
+    } else {
+      setNotice('余额已更新或本地记录保存失败，请重试。');
+    }
+  };
+  const openHistory = (kind: HistoryTab, trigger: HTMLElement) => {
+    historyTrigger.current = trigger;
+    setHistoryTab(kind);
+  };
+  const closeHistory = () => {
+    setHistoryTab(null);
+    const trigger = historyTrigger.current;
+    historyTrigger.current = null;
+    requestAnimationFrame(() => trigger?.focus({ preventScroll: true }));
+  };
 
-        <EventCard
-          title="环球搭子小队"
-          description="找个搭子，各自跑完城市路线，一起解锁大转盘。"
-          image={resolveLocalImage('https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?auto=format&fit=crop&q=80&w=1200')!}
-          accent="cyan"
-          icon={<Users size={16} />}
-          tag={<span className="flex items-center gap-1"><Users size={10} />双人同行</span>}
-          onClick={onSelectTeamRelay}
-          delay={0.05}
-        />
+  return (
+    <>
+      <main className={styles.page} id={earningsOpen || historyTab ? undefined : 'main-content'} aria-label="福利" inert={earningsOpen || !!historyTab || rulesOpen || !!claimedTrack} onScroll={event => setCompact(event.currentTarget.scrollTop >= 64)}>
+        <div className={styles.stickyAnchor}>
+          {compact && <div className={styles.stickyWallet}>
+            <div className={styles.stickyBalances}>
+              <button type="button" onClick={event => openHistory('history', event.currentTarget)} aria-label={`金币明细，${numberFormat.format(rewards.balance)} 金币`}>
+                <Coins size={17} aria-hidden="true" /><b>{numberFormat.format(rewards.balance)}</b><span>金币</span>
+              </button>
+              <button type="button" onClick={event => openHistory('cashHistory', event.currentTarget)} aria-label={`现金明细，${formatCoinValue(rewards.balance)}`}>
+                <Wallet size={16} aria-hidden="true" /><b>{formatCoinValue(rewards.balance)}</b>
+              </button>
+            </div>
+            <button type="button" onClick={openEarnings}>去提现 <ChevronRight size={15} aria-hidden="true" /></button>
+          </div>}
+        </div>
 
-        <EventCard
-          title="周末城市记忆串烧"
-          description="选取 3 个城市经典记忆路线，完成后可抽取现金奖励。"
-          image="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=600&h=400"
-          accent="emerald"
-          icon={<Sparkles size={16} />}
-          tag={<span className="flex items-center gap-1"><Calendar size={10} className="animate-pulse" />每周末开放</span>}
-          onClick={onSelectMedley}
-        />
+        <section className={styles.wallet} aria-label="金币钱包">
+          <div className={styles.walletTop}>
+            <button type="button" onClick={event => openHistory('history', event.currentTarget)}><span>金币收益 (金币)<ChevronRight size={13} aria-hidden="true" /></span><strong>{numberFormat.format(rewards.balance)}</strong></button>
+            <button type="button" onClick={event => openHistory('cashHistory', event.currentTarget)}><span>现金收益 (元)<ChevronRight size={13} aria-hidden="true" /></span><strong>{formatCoinValue(rewards.balance)}</strong></button>
+            <div className={styles.coinArt} aria-hidden="true"><i /><i /><i /><b>✦</b></div>
+          </div>
+          <div className={styles.walletBottom}><span>0点自动兑换成金币</span><button type="button" onClick={openEarnings}>去提现 <ChevronRight size={15} aria-hidden="true" /></button></div>
+        </section>
 
-        <EventCard
-          title="新手任务"
-          description={`首次激活、完成首条路线和首座城市，累计领${FIRST_CITY_TOTAL_CENTS / 100}元。`}
-          image="https://images.unsplash.com/photo-1538805060514-97d9cc17730c?auto=format&fit=crop&q=80&w=600&h=400"
-          accent="rose"
-          icon={<Flame size={16} />}
-          tag={<span className="flex items-center gap-1"><Gift size={10} />累计{FIRST_CITY_TOTAL_CENTS / 100}元</span>}
-          onClick={onSelectFirstCityRewards}
-          delay={0.05}
-        />
+        <div className={styles.content}>
+          <section className={styles.tasks} aria-labelledby="coin-tasks-title">
+            <header><div><h2 id="coin-tasks-title" ref={tasksHeading} tabIndex={-1}>运动得福利</h2><p>今日已获 <strong>{rewards.today.earned}</strong> / {DAILY_COIN_CAP} 金币</p></div><button className={styles.run} type="button" onClick={onRun}>去跑步</button></header>
+            <div className={styles.task}>
+              <div className={styles.taskHeading}><span data-theme="mint"><Footprints size={18} aria-hidden="true" /></span><h3>累计运动里程</h3><strong>{(rewards.today.meters / 1000).toLocaleString('zh-CN', { maximumFractionDigits: 3 })} <small>km</small></strong></div>
+              <RewardMilestones tiers={MILEAGE_REWARDS} value={rewards.today.meters / 1000} track="mileage" starterClaimed={rewards.starterClaims.has('mileage')} onClaim={() => void claimStarter('mileage')} />
+            </div>
+            <div className={styles.task}>
+              <div className={styles.taskHeading}><span data-theme="gold"><Route size={18} aria-hidden="true" /></span><h3>路线通关</h3><strong>{routeCount}<small> / {ROUTE_REWARDS.length} 条</small></strong></div>
+              <RewardMilestones tiers={ROUTE_REWARDS} value={routeCount} track="route" starterClaimed={rewards.starterClaims.has('route')} onClaim={() => void claimStarter('route')} />
+            </div>
+            {claimError && <p className={styles.claimError} role="alert">{claimError}</p>}
+          </section>
 
-        <EventCard
-          title="百人百城计划"
-          description="集结全球跑者，共同解锁全球 100 个标志性城市赛道，抽免费旅行。"
-          image="https://images.unsplash.com/photo-1506501139174-099022df5260?auto=format&fit=crop&q=80&w=600&h=500"
-          accent="purple"
-          icon={<Globe2 size={16} />}
-          tag="抽免费旅行"
-          taller
-          delay={0.1}
-          onClick={onSelectHundredCities}
-        />
+          <section className={styles.more} aria-labelledby="more-benefits-title">
+            <h2 id="more-benefits-title">更多福利</h2>
+            {activities.map(({ name, description, action, icon: Icon, theme, select }) => (
+              <button key={name} type="button" onClick={select}>
+                <span className={styles.benefitIcon} data-theme={theme}><Icon size={19} aria-hidden="true" /></span>
+                <span className={styles.benefitCopy}><strong>{name}</strong><small>{description}</small></span>
+                <span className={styles.benefitAction} aria-hidden="true">{action}</span>
+              </button>
+            ))}
+          </section>
+          <p className={styles.footer}>如有疑问，请查看<button type="button" onClick={() => setRulesOpen(true)}>《活动规则》</button></p>
+        </div>
+      </main>
 
-      </div>
-    </div>
+      {earningsOpen && (
+        <main className={`${styles.page} ${styles.earningsPage}`} id={historyTab ? undefined : 'main-content'} aria-labelledby="earnings-title" inert={!!historyTab || rulesOpen}>
+          <header className={styles.earningsHeader}>
+            <nav className={styles.earningsNav} aria-label="收益页导航">
+              <button type="button" autoFocus onClick={closeEarnings} aria-label="返回福利"><ChevronLeft size={24} aria-hidden="true" /></button>
+              <h1 id="earnings-title">我的收益</h1>
+              <button type="button" onClick={() => setRulesOpen(true)}>规则</button>
+            </nav>
+            <div className={`${styles.walletTop} ${styles.earningsBalance}`}>
+              <button type="button" onClick={event => openHistory('history', event.currentTarget)}><span>金币收益 (金币)<ChevronRight size={14} aria-hidden="true" /></span><strong>{numberFormat.format(rewards.balance)}</strong></button>
+              <button type="button" onClick={event => openHistory('cashHistory', event.currentTarget)}><span>现金收益 (元)<ChevronRight size={14} aria-hidden="true" /></span><strong>{formatCoinValue(rewards.balance)}</strong></button>
+            </div>
+          </header>
+
+          <section className={styles.withdrawCard} aria-labelledby="withdraw-title">
+            <h2 id="withdraw-title"><span><Wallet size={18} aria-hidden="true" /></span>微信提现</h2>
+            <p className={styles.sheetNote}>提现后1-3个工作日内到账</p>
+            <div className={styles.withdrawTiers} role="group" aria-label="提现档位">
+              {WITHDRAWAL_TIERS.map(value => (
+                <button key={value} type="button" aria-pressed={tier === value} disabled={withdrawn} onClick={() => {
+                  setTier(value);
+                  setCustomAmount('');
+                }}>
+                  <strong>{value.toFixed(2)} <small>元</small></strong>
+                </button>
+              ))}
+            </div>
+            <div className={styles.customWithdrawal} data-selected={tier === 'custom'}>
+              <label htmlFor="custom-withdrawal-amount">自定义金额（元）</label>
+              <input id="custom-withdrawal-amount" type="text" inputMode="decimal" autoComplete="off" placeholder="最低 ¥0.01"
+                value={customAmount} onChange={event => {
+                  setTier('custom');
+                  setCustomAmount(event.target.value);
+                }} disabled={withdrawn}
+                aria-invalid={invalidAmount || undefined}
+                aria-describedby="custom-withdrawal-hint" />
+              <small id="custom-withdrawal-hint" role="status">
+                {invalidAmount ? '请输入大于 0、最多两位小数的金额。' : tier === 'custom' && insufficientBalance ? '余额不足。' : `可用余额 ${formatCoinValue(rewards.balance)}`}
+              </small>
+            </div>
+            <button className={`${styles.confirm} ${styles.confirmWechat}`} type="button" disabled={!canWithdraw} onClick={submitWithdrawal}>
+              立即提现
+            </button>
+            {rewards.demo && !demoCreditLoaded && <button className={styles.demo} type="button" onClick={() => setNotice(rewards.loadDemoBalance() ? '已载入 ¥1 演示余额。' : '演示余额已载入或本地记录保存失败。')}>载入 ¥1 演示余额</button>}
+            <p className={styles.notice} role="status">{notice}</p>
+          </section>
+        </main>
+      )}
+
+      {historyTab && (
+        <main className={`${styles.page} ${styles.earningsPage}`} id="main-content" aria-labelledby="history-title" inert={rulesOpen}>
+          <header className={`${styles.earningsHeader} ${styles.historyHeader}`}>
+            <nav className={styles.earningsNav} aria-label="收益记录导航">
+              <button type="button" autoFocus onClick={closeHistory} aria-label="返回"><ChevronLeft size={24} aria-hidden="true" /></button>
+              <h1 id="history-title">收益记录</h1>
+              <button type="button" onClick={() => setRulesOpen(true)}>说明</button>
+            </nav>
+            <dl className={styles.historyBalance}>
+              <div><dt>金币收益 (金币)</dt><dd>{numberFormat.format(rewards.balance)}</dd></div>
+              <div><dt>现金收益 (元)</dt><dd>{formatCoinValue(rewards.balance)}</dd></div>
+            </dl>
+            <p className={styles.historyRate}>10,000 金币兑 ¥1</p>
+          </header>
+          <section className={styles.historyCard} aria-label={historyTabs[historyTab]}>
+            <div className={styles.historyTabs} role="group" aria-label="记录类型">
+              {(['history', 'cashHistory'] as const).map(tab => (
+                <button key={tab} type="button" aria-pressed={historyTab === tab} onClick={() => setHistoryTab(tab)}>{historyTabs[tab]}</button>
+              ))}
+            </div>
+            <RewardHistory ledger={rewards.ledger} showCash={historyTab === 'cashHistory'} showExamples={rewards.localPreview || rewards.demo} />
+          </section>
+        </main>
+      )}
+
+      {claimedTrack && (
+        <Modal labelId={headingId} onClose={closeClaim} className={styles.claimDialog} backdropClassName={styles.claimBackdrop}>
+          <h2 id={headingId}>已获得 <strong>{STARTER_COIN_REWARDS[claimedTrack].coins}</strong> 金币</h2>
+          <p>{trackNames[claimedTrack]}奖励已入账</p>
+          <div className={styles.claimArt} aria-hidden="true">
+            <img src={`${import.meta.env.BASE_URL}images/welfare/coin-purse-vermilion.webp`} alt="" width="544" height="363" />
+            {fallingCoins.map(({ x, drift, delay, size, tilt }) => (
+              <span key={x} className={styles.fallingCoin} style={{
+                left: `${x}%`, width: size, animationDelay: `${delay}ms`,
+                '--coin-drift': `${drift}px`, '--coin-tilt': `${tilt}deg`,
+              } as CSSProperties}>✦</span>
+            ))}
+          </div>
+          <button className={styles.claimDone} type="button" onClick={closeClaim}>收下金币</button>
+          <button className={styles.claimClose} type="button" onClick={closeClaim} aria-label="关闭领取结果"><X size={20} aria-hidden="true" /></button>
+        </Modal>
+      )}
+
+      {rulesOpen && (
+        <Modal labelId={headingId} onClose={() => setRulesOpen(false)} className={styles.sheet} backdropClassName={styles.backdrop}>
+          <header className={styles.sheetHeader}><h2 id={headingId}>活动规则</h2><button type="button" onClick={() => setRulesOpen(false)} aria-label="关闭活动规则"><X size={21} aria-hidden="true" /></button></header>
+          <ol className={styles.rules}>
+            <li>预览中，里程和路线通关的首档奖励可直接领取，各计入当日奖励一次。其余奖励达标后在运动结算时自动入账，单日最多 {DAILY_COIN_CAP} 金币（{formatCoinValue(DAILY_COIN_CAP)}）。</li>
+            <li>同一路线当日只计一次通关，重跑的有效里程照常累计。通关须达到计划里程的 90%，且运动满 15 分钟。</li>
+            <li>按北京时间刷新每日任务，已入账金币继续保留。10,000 金币兑 ¥1，微信钱包模拟提现支持 ¥1、¥3、¥5 固定档位和自定义金额。</li>
+          </ol>
+        </Modal>
+      )}
+    </>
   );
 }

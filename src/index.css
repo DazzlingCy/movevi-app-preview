@@ -1517,8 +1517,32 @@ body { background: var(--bg); }
 .bottom-nav button > span { position: relative; width: 34px; height: 28px; display: grid; place-items: center; margin-inline: auto; border-radius: 12px; transition: background .18s ease, color .18s ease, transform .18s ease; }
 .bottom-nav svg { width: 19px; height: 19px; stroke-width: 1.9; }
 .bottom-nav small { font-size: 9px; font-weight: 500; }
+.bottom-nav__reward-badge {
+  position: absolute;
+  inset-block-start: -9px;
+  inset-inline-end: -14px;
+  padding: 2px 5px;
+  border: 1px solid #ffcf83;
+  border-radius: 999px 999px 999px 4px;
+  background: linear-gradient(125deg, #ffebbd, #ffba64);
+  box-shadow: 0 2px 6px #26130459;
+  color: #582909;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .bottom-nav button.is-active { color: #f2f3f7; }
 .bottom-nav button.is-active > span { background: #262938; color: #c0c5ff; transform: translateY(-1px); }
+.bottom-nav--benefits {
+  border-color: #e4ebe6;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(28,53,43,.1);
+}
+.bottom-nav--benefits button { color: #53635d; }
+.bottom-nav--benefits button.is-active { color: #163f32; }
+.bottom-nav--benefits button.is-active > span { background: #dff3e9; color: #1d6e56; }
 .bottom-nav--home {
   left: 18px;
   right: 18px;

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { ArrowRight, Award, ChevronLeft, MapPin, Pause, Play, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowRight, Award, ChevronLeft, Coins, MapPin, Pause, Play, Volume2, VolumeX, X } from 'lucide-react';
 import { CITIES, getRouteData } from '../data/cities';
 import { reloadRunSceneryVideo } from '../lib/runScenery';
+import { coinMileageCounter, isCoinRouteComplete, type CoinExerciseEvidence, type CoinReward } from '../journey/coinRewards';
 import CityImage from './CityImage';
+import CoinRewardBadge from './CoinRewardBadge';
 import type { CityRouteListItem } from './CityRoutesView';
 import Modal from './journey/Modal';
 import styles from './RunPlaybackView.module.css';
@@ -29,7 +31,13 @@ interface RunPlaybackViewProps {
   onExit: () => void;
   requireFullRoute?: boolean;
   demoCompleteSignal?: number;
-  onComplete: (stats: { distance: number; duration: number; calories: number }) => void;
+  coinRewards?: {
+    demo: boolean;
+    tracking: boolean;
+    preview: (evidence: CoinExerciseEvidence) => CoinReward | undefined;
+    progress: (evidence: CoinExerciseEvidence) => { coins: number; fraction: number } | undefined;
+  };
+  onComplete: (stats: { distance: number; duration: number; calories: number }, evidence?: CoinExerciseEvidence) => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -43,12 +51,13 @@ const parsePlannedDuration = (value: string) => {
   return minutes * 60 + seconds;
 };
 
-export default function RunPlaybackView({ cityId, routeIndex, image, cityName: cityNameOverride, routeOverride, prepareScenery, onExit, onComplete, requireFullRoute = false, demoCompleteSignal = 0 }: RunPlaybackViewProps) {
+export default function RunPlaybackView({ cityId, routeIndex, image, cityName: cityNameOverride, routeOverride, prepareScenery, onExit, onComplete, requireFullRoute = false, demoCompleteSignal = 0, coinRewards }: RunPlaybackViewProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [distance, setDistance] = useState(0);
   const [time, setTime] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
   const [showRunActions, setShowRunActions] = useState(false);
+  const [coinEvidence, setCoinEvidence] = useState<CoinExerciseEvidence>();
   const runActionsTitleId = useId();
   const runSummaryTitleId = useId();
   const sceneryHostRef = useRef<HTMLDivElement>(null);
@@ -64,6 +73,13 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
   const plannedDistance = Number(route.distance) || 0;
   const plannedDuration = parsePlannedDuration(route.duration);
   const routeFinished = !requireFullRoute || distance >= plannedDistance;
+  const manuallySimulated = !!coinEvidence && coinEvidence.source !== 'playback';
+  const simulatedPartial = manuallySimulated && !isCoinRouteComplete({ ...coinEvidence, plannedMeters: Math.round(plannedDistance * 1000) });
+  const reward = showSummary && coinEvidence ? coinRewards?.preview(coinEvidence) : undefined;
+  const liveEvidence: CoinExerciseEvidence = {
+    meters: Math.round(distance * 1000), activeSeconds: time, endedAt: Date.now(), source: 'playback',
+  };
+  const coinProgress = showSummary ? coinRewards?.progress(coinEvidence ?? liveEvidence) : undefined;
   const runActive = isPlaying && !showRunActions && !showSummary;
   useEffect(() => {
     if (!demoCompleteSignal) return;
@@ -157,9 +173,18 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
   }).replace(/\//g, '/');
 
   const finishRun = () => {
+    if (coinRewards?.tracking && liveEvidence.meters > 0 && liveEvidence.activeSeconds > 0) setCoinEvidence(liveEvidence);
     setIsPlaying(false);
     setShowRunActions(false);
     setShowSummary(true);
+  };
+
+  const simulateCoinWorkout = (complete: boolean) => {
+    const meters = complete ? Math.round(plannedDistance * 1000) : 1000;
+    const activeSeconds = complete ? Math.max(plannedDuration, 15 * 60) : 8 * 60;
+    setDistance(meters / 1000);
+    setTime(activeSeconds);
+    setCoinEvidence({ meters, activeSeconds, endedAt: Date.now() });
   };
 
   const toggleRunPause = () => {
@@ -198,6 +223,9 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
       </header>
 
       <main className={styles.hud} id="main-content">
+        {!showSummary && !showRunActions && coinRewards?.tracking && (
+          <CoinRewardBadge {...coinMileageCounter(liveEvidence.meters)} className={styles.coinFloat} variant="live" />
+        )}
         {!isPlaying && !showSummary && <p className={styles.pausedLabel} role="status">运动已暂停</p>}
         <dl className={styles.metrics} aria-label="运动数据">
           <div><dt>时间</dt><dd>{formatTime(time)}</dd></div>
@@ -260,7 +288,7 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
           <header className={styles.summaryHeader}>
             <div className={styles.summaryHeading}>
               <p className={styles.summaryKicker}>运动结算</p>
-              <h2 id={runSummaryTitleId}>{routeFinished ? '路线已完成' : '路线尚未完成'}</h2>
+              <h2 id={runSummaryTitleId}>{simulatedPartial ? '运动已结束' : routeFinished ? '路线已完成' : '路线尚未完成'}</h2>
               <p className={styles.summaryRoute}>{cityName} · {route.title}</p>
             </div>
             <span className={styles.summaryDate}>{todayDateStr}</span>
@@ -282,7 +310,18 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
               </div>
             </dl>
 
-            <section className={styles.summaryMedals} aria-label="获得勋章">
+            {coinRewards && <section className={styles.summaryCoins} aria-label="金币奖励">
+              <h3><Coins size={15} aria-hidden="true" /> 金币奖励 <strong>+{(reward?.mileage ?? 0) + (reward?.route ?? 0)}</strong></h3>
+              {coinProgress && <CoinRewardBadge {...coinProgress} className={styles.summaryCoinBadge} />}
+              <dl><div><dt>里程奖励</dt><dd>+{reward?.mileage ?? 0}</dd></div><div><dt>路线通关奖励</dt><dd>+{reward?.route ?? 0}</dd></div></dl>
+              {coinRewards.demo && !requireFullRoute ? (
+                manuallySimulated ? <small>本次为模拟有效运动</small> : <div className={styles.coinDemoActions}>
+                  <button type="button" onClick={() => simulateCoinWorkout(false)}>模拟运动 1 km</button>
+                  <button type="button" onClick={() => simulateCoinWorkout(true)}>模拟通关</button>
+                </div>
+              ) : <small>{coinRewards.tracking ? '预计金币将在结算确认后入账。' : '金币仅计入跑步机的有效运动数据。'}</small>}
+            </section>}
+            {!simulatedPartial && <section className={styles.summaryMedals} aria-label="获得勋章">
               <h3><Award size={14} aria-hidden="true" /> 获得勋章</h3>
               <ul>
                 {MEDALS.slice(0, 3).map(medal => (
@@ -291,20 +330,20 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
                   </li>
                 ))}
               </ul>
-            </section>
+            </section>}
           </div>
 
           <footer className={styles.summaryFooter}>
             <div className={styles.summaryButtons}>
-              <button type="button" onClick={() => routeFinished ? onComplete(result) : onExit()}>
+              <button type="button" onClick={() => routeFinished ? onComplete(result, coinEvidence) : onExit()}>
                 {routeFinished ? '完成并返回' : '返回路线详情'}
               </button>
-              <button type="button" onClick={() => {
-                if (routeFinished) onComplete(result);
+              {!simulatedPartial && <button type="button" onClick={() => {
+                if (routeFinished) onComplete(result, coinEvidence);
                 else { setShowSummary(false); setIsPlaying(true); }
               }}>
                 {routeFinished ? '继续下一路线' : '继续这条路线'} <ArrowRight size={15} aria-hidden="true" />
-              </button>
+              </button>}
             </div>
           </footer>
         </Modal>
