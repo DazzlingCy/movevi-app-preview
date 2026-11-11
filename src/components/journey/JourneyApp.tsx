@@ -1,5 +1,5 @@
 import { periodOpen, weekendPeriod } from '../../journey/weekendRelay';
-import { Fragment, lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
+import { Fragment, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   ArrowRight, BookOpen, CalendarDays, Check, ChevronLeft, ChevronRight, CircleHelp, ClipboardList,
@@ -27,7 +27,7 @@ import MedalLotteryView from '../MedalLotteryView';
 import OnlineSupportView from '../OnlineSupportView';
 import MyDevicesView from '../MyDevicesView';
 import DeviceConnectedPrompt from '../DeviceConnectedPrompt';
-import { resolveLocalImage, resolveRecommendationCover } from '../../lib/localImages';
+import { resolveCityCover, resolveLocalImage, resolveRecommendationCover } from '../../lib/localImages';
 import { createRunSceneryVideo } from '../../lib/runScenery';
 import RouteDetailView from '../RouteDetailView';
 import RunPlaybackView from '../RunPlaybackView';
@@ -120,10 +120,10 @@ const CITY_RUNNER_COUNTS: Record<string, number> = {
 
 const DEFAULT_JOURNEY_CITY_VIDEO = JOURNEY_CITY_VIDEOS.tokyo!;
 
-const cityImageFor = (city: JourneyCity) => resolveLocalImage(
-  JOURNEY_CITY_IMAGES[city.id]
+const cityImageSource = (city: JourneyCity) => JOURNEY_CITY_IMAGES[city.id]
   ?? CITIES.find(item => item.name === city.name || item.englishName === city.englishName)?.image
-  ?? 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&q=80&w=1200')!;
+  ?? 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&q=80&w=1200';
+const cityImageFor = (city: JourneyCity) => resolveLocalImage(cityImageSource(city))!;
 
 const cityVideoFor = (city: JourneyCity) => JOURNEY_CITY_VIDEOS[city.id] ?? DEFAULT_JOURNEY_CITY_VIDEO;
 
@@ -334,25 +334,30 @@ function CityVideoPreview({ src }: { src: string }) {
   );
 }
 
-function HomeCityCover({ image, loading, priority, video }: {
-  image: string;
-  loading: 'lazy' | 'eager';
-  priority: 'high' | 'auto' | 'low';
+function HomeCityCover({ city, priority, className = 'destination-card__photo', video }: {
+  city: JourneyCity;
+  priority: 'high' | 'low';
+  className?: string;
   video?: string;
 }) {
   const [imageSettled, setImageSettled] = useState(false);
+  const [retryOriginal, setRetryOriginal] = useState(false);
+  const original = cityImageFor(city);
+  const cover = resolveCityCover(cityImageSource(city), 'cover');
 
   return (
     <>
       <img
-        className="destination-card__photo"
-        src={image}
-        loading={loading}
+        className={className}
+        src={retryOriginal ? original : cover}
         fetchPriority={priority}
         decoding="async"
         alt=""
         onLoad={() => setImageSettled(true)}
-        onError={() => setImageSettled(true)}
+        onError={() => {
+          if (!retryOriginal && cover !== original) setRetryOriginal(true);
+          else setImageSettled(true);
+        }}
       />
       {imageSettled && video && <CityVideoPreview src={video} />}
     </>
@@ -361,6 +366,7 @@ function HomeCityCover({ image, loading, priority, video }: {
 
 function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoalKm, allowGoalAnimation, onEditDailyGoal, city, deviceConnected, onRoutes, onRecommendations, onRunScenes, onBrowseCity, onSelectNextCity, focusNextStation, onNextStationFocused, onDevice, onLegacyFeature, onCarouselEnd }: HomePageProps) {
   const carouselRef = useRef<HTMLDivElement>(null);
+  const [nearbyCoverIds, setNearbyCoverIds] = useState(() => new Set<string>());
   const hasAlignedCarouselRef = useRef(false);
   const programmaticScrollRef = useRef(false);
   const carouselSettlerRef = useRef<ReturnType<typeof createCarouselSettler> | null>(null);
@@ -477,6 +483,19 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
   const carouselCityOrder = homeJourneyCities.map(item => item.id).join(',');
   useEffect(() => {
     const carousel = carouselRef.current;
+    if (!carousel || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => {
+      const nearby = entries.filter(entry => entry.intersectionRatio >= 0.3);
+      if (!nearby.length) return;
+      nearby.forEach(entry => observer.unobserve(entry.target));
+      setNearbyCoverIds(ids => new Set([...ids, ...nearby.map(entry => (entry.target as HTMLElement).dataset.cityId ?? 'next-station')]));
+    }, { root: carousel, rootMargin: '0px 25%', threshold: 0.3 });
+    carousel.querySelectorAll('[data-city-id], [data-next-station]').forEach(card => observer.observe(card));
+    return () => observer.disconnect();
+  }, [carouselCityOrder]);
+
+  useEffect(() => {
+    const carousel = carouselRef.current;
     if (!carousel) return;
     const measureCards = () => {
       cardMeasurementsRef.current = [...carousel.querySelectorAll<HTMLElement>('[data-city-id], [data-next-station]')]
@@ -497,11 +516,12 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
     }
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const carousel = carouselRef.current;
     const target = carousel?.querySelector<HTMLElement>(`[data-city-id="${city.id}"]`);
     if (!carousel || !target) return;
     const targetLeft = target.offsetLeft - (carousel.clientWidth - target.clientWidth) / 2;
+    if (!hasAlignedCarouselRef.current) carousel.scrollTo({ left: targetLeft, behavior: 'instant' });
     if (Math.abs(carousel.scrollLeft - targetLeft) < 3) {
       programmaticScrollRef.current = false;
       hasAlignedCarouselRef.current = true;
@@ -511,10 +531,7 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
     }
     setCarouselBrowsing(true);
     programmaticScrollRef.current = true;
-    carousel.scrollTo({
-      left: targetLeft,
-      behavior: hasAlignedCarouselRef.current ? 'smooth' : 'auto'
-    });
+    carousel.scrollTo({ left: targetLeft, behavior: 'smooth' });
     hasAlignedCarouselRef.current = true;
     armCarouselSettle();
   }, [city.id, armCarouselSettle, requestCarouselVisualUpdate, setCarouselBrowsing]);
@@ -792,8 +809,8 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
           {homeJourneyCities.map((item, index) => {
             const itemStatus = getCityStatus(state, item.id);
             const releaseDate = getCityRouteReleaseDate(item.id);
-            const coverPriority = index === cityIndex ? 'high' : Math.abs(index - cityIndex) === 1 ? 'auto' : 'low';
-            const coverLoading = coverPriority === 'low' ? 'lazy' : 'eager';
+            const coverPriority = index === cityIndex ? 'high' : 'low';
+            const showCover = Math.abs(index - cityIndex) <= 1 || nearbyCoverIds.has(item.id) || typeof IntersectionObserver === 'undefined';
             if (!hasPublishedCityRoutes(item.id) && releaseDate) {
               return (
                 <section
@@ -804,7 +821,7 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
                   aria-label={`${item.name}，尚未开放，预计${releaseDate}开放`}
                   onClick={() => handleCityCardClick(item.id)}
                 >
-                  <img className="destination-upcoming-card__photo" src={cityImageFor(item)} loading={coverLoading} fetchPriority={coverPriority} decoding="async" alt="" />
+                  {showCover && <HomeCityCover city={item} className="destination-upcoming-card__photo" priority={coverPriority} />}
                   <span className="destination-upcoming-card__shade" aria-hidden="true" />
                   <span className="destination-upcoming-card__status"><Clock3 />尚未开放</span>
                   <div className="destination-upcoming-card__copy">
@@ -834,12 +851,11 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
               <Fragment key={item.id}>
                 <section className={`destination-journey-card${item.id === city.id ? ' is-active' : ' is-side'}`} data-city-id={item.id} key={item.id} style={cityStyle(item)} aria-label={`${item.name}，${itemLabel}${isNew ? '，新上线' : ''}`} onClick={() => handleCityCardClick(item.id)}>
                   <div className="destination-card">
-                    <HomeCityCover
-                      image={cityImageFor(item)}
-                      loading={coverLoading}
+                    {showCover && <HomeCityCover
+                      city={item}
                       priority={coverPriority}
                       video={itemStatus === 'current' && item.id === city.id ? cityVideoFor(item) : undefined}
-                    />
+                    />}
                     <div className="destination-card__overlay" />
                     {isNew && <span className="city-new-badge destination-card__new" aria-hidden="true">NEW</span>}
                     <div className={`destination-card__content ${homeRunStyles.coverContent}`}>
@@ -911,7 +927,9 @@ function HomePage({ state, newCityIds, recommendations, todayExercise, dailyGoal
                           data-obscured={!currentCityCompleted ? 'true' : undefined}
                           style={cityStyle(candidate)}
                         >
-                          <img src={cityImageFor(candidate)} alt="" aria-hidden="true" />
+                          {(currentCityCompleted || nearbyCoverIds.has('next-station') || typeof IntersectionObserver === 'undefined') && (
+                            <CityImage src={cityImageFor(candidate)} optimizedSrc={resolveCityCover(cityImageSource(candidate), 'grid')} alt="" />
+                          )}
                           <span>{String(candidateIndex + 1).padStart(2, '0')}</span>
                           {currentCityCompleted && <><strong>{candidate.name}</strong><small>{candidate.englishName}</small></>}
                         </button>
@@ -1011,7 +1029,7 @@ function CityListSheet({ state, selectedCityId, onSelect, onClose }: { state: Jo
           const isSelected = status !== 'locked' && status !== 'upcoming' && selectedCityId === item.id;
           return (
             <button className={`city-list-card city-list-card--${status}${isSelected ? ' is-selected' : ''}`} type="button" key={item.id} onClick={() => { onSelect(item.id); onClose(); }} aria-label={`${String(index + 1).padStart(2, '0')} ${item.name} ${item.englishName}，${statusLabel}${releaseDate ? `，预计${releaseDate}开放` : '，查看城市路线'}`} aria-pressed={isSelected} disabled={status === 'upcoming'} style={cityStyle(item)}>
-              <img className="city-list-card__photo" src={cityImageFor(item)} alt="" aria-hidden="true" />
+              <CityImage className="city-list-card__photo" src={cityImageFor(item)} optimizedSrc={resolveCityCover(cityImageSource(item), 'grid')} alt="" />
               <span className="city-list-card__veil" aria-hidden="true" />
               <span className="city-list-card__number">{String(index + 1).padStart(2, '0')}</span>
               {StatusIcon && <span className="city-list-card__status"><StatusIcon />{statusText[status]}</span>}
@@ -2027,7 +2045,7 @@ export default function JourneyApp() {
             />
           </motion.div>
         )
-        : routeSheetCity ? <motion.div className="screen-layer" key="legacy-route-list" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><CityRoutesView city={toLegacyCity(routeSheetCity, state)} routeItems={routeSheetCity.routes.map(route => toLegacyRouteItem(route, state))} completedRouteIndices={routeSheetCity.routes.filter(route => getCompletedRouteIds(state, routeSheetCity.id).includes(route.id)).map(route => route.order)} openRouteCount={getRouteListOpenCount(state, routeSheetCity.id)} onBack={closeCityRoutes} onRouteClick={openLegacyRoute} /></motion.div>
+        : routeSheetCity ? <motion.div className="screen-layer" key="legacy-route-list" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><CityRoutesView city={toLegacyCity(routeSheetCity, state)} cityCover={resolveCityCover(cityImageSource(routeSheetCity), 'cover')} routeItems={routeSheetCity.routes.map(route => toLegacyRouteItem(route, state))} completedRouteIndices={routeSheetCity.routes.filter(route => getCompletedRouteIds(state, routeSheetCity.id).includes(route.id)).map(route => route.order)} openRouteCount={getRouteListOpenCount(state, routeSheetCity.id)} onBack={closeCityRoutes} onRouteClick={openLegacyRoute} /></motion.div>
         : activeTab === 'profile' ? <motion.div className="screen-layer" key="profile" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><ProfilePage totals={totals} countryLevel={countryLevel} onDevice={() => setUtilityMode('device')} onLevel={() => openLegacyFeature('level')} onSettings={() => setUtilityMode('profile')} onFeature={label => setNotice(`${label} · 演示入口`)} /></motion.div>
         : activeTab === 'activity' ? <motion.div className="screen-layer" key="activity" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><EventsTab onSelectMedalLottery={() => openLegacyFeature('medalLottery')} onSelectMedley={() => openLegacyFeature('weekendMedley')} onSelectFirstCityRewards={() => openLegacyFeature('firstCityRewards')} onSelectTeamRelay={() => {openLegacyFeature('teamRelay');}} onSelectHundredCities={() => setNotice('百人百城计划 · 筹备中')} /></motion.div>
         : activeTab === 'world' ? <motion.div className="screen-layer" key="world" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><MapPage state={state} totals={totals} onOpenCity={openCity} onCities={() => setCityListOpen(true)} onLeaderboard={() => openLegacyFeature('leaderboard')} onCountryLevel={() => openLegacyFeature('level')} /></motion.div>

@@ -2,6 +2,7 @@ import StickyHeroNav from './StickyHeroNav';
 import { useId, useRef, useState } from 'react';
 import { Play, ChevronLeft, MessageCircle, MapPin, AlignLeft, X, Lock, UserRound } from 'lucide-react';
 import { getRouteData } from '../data/cities';
+import { resolveRecommendationCover } from '../lib/localImages';
 import CityImage from './CityImage';
 import RouteRunners from './RouteRunners';
 import Modal from './journey/Modal';
@@ -77,7 +78,7 @@ export default function RouteDetailView({ cityId, routeIndex, image, routeOverri
           </button>
         </StickyHeroNav>
         <header className={styles.hero}>
-          <CityImage src={routeOverride?.coverImage || image} alt="" fallbackLabel={routeData.title} className={styles.heroImage} loading="eager" fetchPriority="high" />
+          <CityImage src={routeOverride?.coverImage || image} optimizedSrc={resolveRecommendationCover(routeOverride?.coverImage, 'feature')} alt="" fallbackLabel={routeData.title} className={styles.heroImage} loading="eager" fetchPriority="high" />
           <div className={styles.heroShade} />
           <div className={styles.heroContent}>
             <h1>{routeData.title}</h1>

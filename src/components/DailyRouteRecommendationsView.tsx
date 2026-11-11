@@ -36,12 +36,14 @@ export default function DailyRouteRecommendationsView({ cityImageFor, day, scene
   const cards = recommendations.map(({ city, route }, index) => {
     const featured = isScene || index === 0;
     const category = getRouteCategory(city.name, route.order);
+    const cover = getRouteCover(city.name, route.order)?.src;
     return (
       <button type="button" className={`${styles.route}${featured ? ` ${styles.featured}` : ''}`} onClick={() => onRouteClick(route, isScene ? index : (pageRef.current?.scrollTop ?? 0))}>
         <span className={styles.cover}>
           <CityImage
             className={styles.image}
-            src={resolveRecommendationCover(getRouteCover(city.name, route.order)?.src, featured ? 'feature' : 'thumbnail') ?? cityImageFor(city)}
+            src={cover ?? cityImageFor(city)}
+            optimizedSrc={resolveRecommendationCover(cover, featured ? 'feature' : 'thumbnail')}
             alt=""
             fallbackLabel={route.landmarks[0]}
             loading={(isScene ? Math.abs(index - priorityIndex) <= 1 : index < 3) ? 'eager' : 'lazy'}
