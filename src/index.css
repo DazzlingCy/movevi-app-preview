@@ -1533,16 +1533,17 @@ body { background: var(--bg); }
   white-space: nowrap;
   pointer-events: none;
 }
-.bottom-nav button.is-active { color: #f2f3f7; }
-.bottom-nav button.is-active > span { background: #262938; color: #c0c5ff; transform: translateY(-1px); }
+.bottom-nav button.is-active { color: #ffffff; }
+.bottom-nav button.is-active > span { background: #ffffff14; color: #ffffff; transform: translateY(-1px); }
+.bottom-nav button.is-active small { font-weight: 700; }
 .bottom-nav--benefits {
-  border-color: #e4ebe6;
+  border-color: #eee0d5;
   background: #fff;
-  box-shadow: 0 8px 28px rgba(28,53,43,.1);
+  box-shadow: 0 8px 28px rgba(79,37,28,.12);
 }
-.bottom-nav--benefits button { color: #53635d; }
-.bottom-nav--benefits button.is-active { color: #163f32; }
-.bottom-nav--benefits button.is-active > span { background: #dff3e9; color: #1d6e56; }
+.bottom-nav--benefits button { color: #69554d; }
+.bottom-nav--benefits button.is-active { color: #202124; }
+.bottom-nav--benefits button.is-active > span { background: #2021240d; color: #202124; }
 .bottom-nav--home {
   left: 18px;
   right: 18px;

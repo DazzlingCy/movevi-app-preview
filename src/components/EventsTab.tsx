@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type CSSProperties } from 'react';
-import { ChevronLeft, ChevronRight, Coins, Footprints, Gift, Globe2, Route, Sparkle, Users, Wallet, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Coins, Footprints, Gift, Globe2, Route, Sparkle, Users, Wallet, X } from 'lucide-react';
 import { COINS_PER_YUAN, DAILY_COIN_CAP, MILEAGE_REWARDS, ROUTE_REWARDS, STARTER_COIN_REWARDS, WITHDRAWAL_TIERS, formatCoinValue, parseWithdrawalCoins, type CoinEntry, type CoinTrack, type WithdrawalTier } from '../journey/coinRewards';
 import type { useCoinRewards } from '../journey/useCoinRewards';
 import Modal from './journey/Modal';
@@ -52,7 +52,7 @@ function RewardMilestones({ tiers, value, track, starterClaimed, onClaim }: {
           <>
             <span className={styles.tierReward}>
               <span className={styles.tierCoins}>+{tier.coins}<span className={styles.srOnly}> 金币{reached ? '，已入账' : ''}</span></span>
-              <span className={styles.tierCoinIcon} aria-hidden="true"><Sparkle size={10} /></span>
+              <span className={styles.tierCoinIcon} aria-hidden="true">{reached ? <Check size={11} strokeWidth={3} /> : <Sparkle size={10} />}</span>
             </span>
             {isMileage && <span className={styles.timelineDot} aria-hidden="true" />}
             <span className={styles.tierGoal}>{goal}</span>
@@ -128,8 +128,8 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
   const headingId = useId();
   const activities = [
     { name: '勋章盲盒抽奖', description: '用盲盒券兑换抽奖机会', icon: Gift, theme: 'gold', select: onSelectMedalLottery },
-    { name: '百人百城计划', icon: Globe2, theme: 'violet', select: onSelectHundredCities },
-    { name: '环球搭子小队', description: '双人组队，完成城市路线', icon: Users, theme: 'mint', select: onSelectTeamRelay },
+    { name: '百人百城计划', icon: Globe2, theme: 'red', select: onSelectHundredCities },
+    { name: '环球搭子小队', description: '双人组队，完成城市路线', icon: Users, theme: 'sand', select: onSelectTeamRelay },
   ];
   const routeCount = Math.min(rewards.today.routes.size, ROUTE_REWARDS.length);
   const amount = tier === 'custom' ? customAmount : tier;
@@ -235,7 +235,7 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
               <button className={styles.run} type="button" onClick={onRun}>去跑步</button>
             </header>
             <div className={styles.task}>
-              <div className={styles.taskHeading}><span data-theme="mint"><Footprints size={18} aria-hidden="true" /></span><h3>累计运动里程</h3><strong>{(rewards.today.meters / 1000).toLocaleString('zh-CN', { maximumFractionDigits: 3 })} <small>km</small></strong></div>
+              <div className={styles.taskHeading}><span data-theme="sand"><Footprints size={18} aria-hidden="true" /></span><h3>累计运动里程</h3><strong>{(rewards.today.meters / 1000).toLocaleString('zh-CN', { maximumFractionDigits: 3 })} <small>km</small></strong></div>
               <RewardMilestones tiers={MILEAGE_REWARDS} value={rewards.today.meters / 1000} track="mileage" starterClaimed={rewards.starterClaims.has('mileage')} onClaim={() => void claimStarter('mileage')} />
             </div>
             <div className={styles.task}>
