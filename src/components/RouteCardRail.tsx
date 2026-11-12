@@ -1,7 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode, type PointerEvent } from 'react';
 import styles from './RouteCardRail.module.css';
 
-export default function RouteCardRail({ items, initialIndex = 0, onSelect }: { items: ReactNode[]; initialIndex?: number; onSelect: (index: number) => void }) {
+interface Props {
+  items: ReactNode[];
+  initialIndex?: number;
+  onSelect: (index: number) => void;
+  onSwipePastStart?: () => void;
+}
+
+export default function RouteCardRail({ items, initialIndex = 0, onSelect, onSwipePastStart }: Props) {
   const railRef = useRef<HTMLDivElement>(null);
   const indexRef = useRef(initialIndex);
   const callbackRef = useRef(onSelect);
@@ -9,7 +16,8 @@ export default function RouteCardRail({ items, initialIndex = 0, onSelect }: { i
   const settleFrameRef = useRef(0);
   const slidesRef = useRef<{ element: HTMLElement; center: number }[]>([]);
   const blockClickUntil = useRef(0);
-  const dragRef = useRef<{ id: number; x: number; left: number; moved: boolean; lastX: number; time: number; velocity: number } | null>(null);
+  const dragRef = useRef<{ id: number; x: number; y: number; left: number; moved: boolean; lastX: number; time: number; velocity: number } | null>(null);
+  const edgeTouch = useRef<{ id: number; x: number; y: number } | null>(null);
   useEffect(() => { callbackRef.current = onSelect; }, [onSelect]);
 
   const prefersReducedMotion = (rail: HTMLDivElement) => rail.closest('[data-reduced-motion="true"]') !== null
@@ -75,6 +83,13 @@ export default function RouteCardRail({ items, initialIndex = 0, onSelect }: { i
     };
   }, [items.length]);
 
+  const finishStartSwipe = (rail: HTMLDivElement, dx: number, dy: number) => {
+    if (!onSwipePastStart || rail.scrollLeft > 2 || dx < 64 || dx <= Math.abs(dy) * 1.4) return false;
+    blockClickUntil.current = performance.now() + 250;
+    onSwipePastStart();
+    return true;
+  };
+
   const finishDrag = (event: PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.id !== event.pointerId) return;
@@ -85,6 +100,10 @@ export default function RouteCardRail({ items, initialIndex = 0, onSelect }: { i
 
     const now = performance.now();
     blockClickUntil.current = now + 250;
+    if (event.type === 'pointerup' && drag.left <= 2 && finishStartSwipe(rail, event.clientX - drag.x, event.clientY - drag.y)) {
+      delete rail.dataset.dragging;
+      return;
+    }
     const velocity = now - drag.time < 85 ? drag.velocity : 0;
     const limit = rail.clientWidth * .32;
     const momentum = Math.min(limit, Math.max(-limit, velocity * 140));
@@ -133,10 +152,24 @@ export default function RouteCardRail({ items, initialIndex = 0, onSelect }: { i
         const slide = (event.target as HTMLElement).closest<HTMLElement>('[data-route-slide]');
         if (slide && (event.target as HTMLElement).matches(':focus-visible')) go(Number(slide.dataset.routeSlide), false);
       }}
+      onTouchStart={event => {
+        edgeTouch.current = null;
+        if (!onSwipePastStart || event.touches.length !== 1 || event.currentTarget.scrollLeft > 2) return;
+        const touch = event.touches[0];
+        edgeTouch.current = { id: touch.identifier, x: touch.clientX, y: touch.clientY };
+      }}
+      onTouchEnd={event => {
+        const start = edgeTouch.current;
+        edgeTouch.current = null;
+        if (!start) return;
+        const touch = event.changedTouches[0];
+        if (touch?.identifier === start.id) finishStartSwipe(event.currentTarget, touch.clientX - start.x, touch.clientY - start.y);
+      }}
+      onTouchCancel={() => { edgeTouch.current = null; }}
       onPointerDown={event => {
         stopSettling(event.currentTarget);
         if (event.pointerType === 'mouse' && event.button === 0) dragRef.current = {
-          id: event.pointerId, x: event.clientX, left: event.currentTarget.scrollLeft, moved: false,
+          id: event.pointerId, x: event.clientX, y: event.clientY, left: event.currentTarget.scrollLeft, moved: false,
           lastX: event.clientX, time: performance.now(), velocity: 0,
         };
       }}

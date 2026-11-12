@@ -2125,7 +2125,7 @@ export default function JourneyApp() {
             {selectedScene ? (
               <DailyRouteRecommendationsView
                 cityImageFor={cityImageFor}
-                sceneName={selectedScene.label}
+                scene={selectedScene}
                 homeControls={<>
                   <div className="home-destination-actions">
                     <HomeRunModeButton onClick={openRunScenes} />
@@ -2136,6 +2136,7 @@ export default function JourneyApp() {
                 recommendations={getSceneRoutes(selectedScene, state)}
                 routeIndex={sceneRouteIndex.current}
                 onRouteIndexChange={index => { sceneRouteIndex.current = index; }}
+                onOpenRunScenes={openRunScenes}
                 onRouteClick={(route, index) => openRecommendedRoute(route, index, 'scene')}
               />
             ) : (

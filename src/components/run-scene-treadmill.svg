@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 140" fill="none">
+  <defs>
+    <linearGradient id="room" x1="25" y1="140" x2="190" y2="4" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#41304f"/>
+      <stop offset="1" stop-color="#9278b6"/>
+    </linearGradient>
+    <linearGradient id="window" x1="106" y1="8" x2="192" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ead8fc"/>
+      <stop offset="1" stop-color="#a891cc"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#room)" d="M0 0h240v140H0z"/>
+  <path fill="url(#window)" d="M103 0h109v86H103z"/>
+  <path stroke="#6f5c8b" stroke-width="3" d="M140 0v86m36-86v86M103 59h109"/>
+  <path fill="#5c486e" d="M0 103h240v37H0z"/>
+  <path fill="#bfa8dd" opacity=".32" d="m111 103-47 37h108l35-37z"/>
+  <ellipse cx="146" cy="125" rx="73" ry="8" fill="#3e304c"/>
+  <path stroke="#251e31" stroke-linecap="round" stroke-linejoin="round" stroke-width="6" d="m177 114 9-61h16m-18 17h-24"/>
+  <path fill="#241d2e" stroke="#cebce5" stroke-width="2" d="M91 112h89l14 7a4 4 0 0 1-2 7H78a4 4 0 0 1-2-7z"/>
+  <rect x="181" y="46" width="24" height="10" rx="3" fill="#34273e"/>
+  <path stroke="#c8f3d9" stroke-width="2" stroke-linecap="round" d="M188 51h10"/>
+</svg>

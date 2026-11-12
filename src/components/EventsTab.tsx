@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type CSSProperties } from 'react';
 import { Check, ChevronLeft, ChevronRight, Coins, Footprints, Gift, Globe2, Route, Users, Wallet, X } from 'lucide-react';
-import { DAILY_COIN_CAP, MILEAGE_REWARDS, ROUTE_REWARDS, STARTER_COIN_REWARDS, WITHDRAWAL_TIERS, formatCoinValue, parseWithdrawalCoins, type CoinEntry, type CoinTrack, type WithdrawalTier } from '../journey/coinRewards';
+import { COINS_PER_YUAN, DAILY_COIN_CAP, MILEAGE_REWARDS, ROUTE_REWARDS, STARTER_COIN_REWARDS, WITHDRAWAL_TIERS, formatCoinValue, parseWithdrawalCoins, type CoinEntry, type CoinTrack, type WithdrawalTier } from '../journey/coinRewards';
 import type { useCoinRewards } from '../journey/useCoinRewards';
 import Modal from './journey/Modal';
 import styles from './EventsTab.module.css';
@@ -40,16 +40,18 @@ function RewardMilestones({ tiers, value, track, starterClaimed, onClaim }: {
 }) {
   const current = tiers.findIndex((tier, index) => value < tier.goal && !(index === 0 && starterClaimed));
   return (
-    <ol className={styles.milestones} data-kind={track}>
+    <ol className={styles.milestones}>
       {tiers.map((tier, index) => {
         const reached = value >= tier.goal || (index === 0 && starterClaimed);
         const claimable = index === 0 && !reached;
         const goal = track === 'route' ? `第 ${tier.goal} 条` : `${tier.goal} km`;
         const tileContent = (
           <>
-            <span className={styles.tierCoins}>+{tier.coins}<span className={styles.srOnly}> 金币{reached ? '，已入账' : ''}</span></span>
-            {track === 'mileage' ? <span className={styles.coinStack} aria-hidden="true">✦</span>
-              : <span className={styles.envelopeSeal} aria-hidden="true">✦</span>}
+            <span className={styles.tierGoal}>{goal}</span>
+            <span className={styles.tierCoins}>
+              <Coins className={styles.tierCoinIcon} size={13} aria-hidden="true" />
+              +{tier.coins}<span className={styles.srOnly}> 金币{reached ? '，已入账' : ''}</span>
+            </span>
             {(claimable || reached) && (
               <span className={styles.rewardStatus} aria-hidden="true">
                 {reached ? <><Check size={10} strokeWidth={2.5} />已领取</> : '领取'}
@@ -61,7 +63,6 @@ function RewardMilestones({ tiers, value, track, starterClaimed, onClaim }: {
           <li key={tier.goal} data-reached={reached} data-claimable={claimable} aria-current={index === current ? 'step' : undefined}>
             {claimable ? <button type="button" className={styles.rewardTile} aria-label={`领取${trackNames[track]} ${goal} 奖励，${tier.coins} 金币`} onClick={onClaim}>{tileContent}</button>
               : <span className={styles.rewardTile}>{tileContent}</span>}
-            <span className={styles.tierGoal}>{goal}</span>
           </li>
         );
       })}
@@ -119,15 +120,16 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
   const [claimError, setClaimError] = useState('');
   const claiming = useRef(false);
   const tasksHeading = useRef<HTMLHeadingElement>(null);
+  const walletRef = useRef<HTMLElement>(null);
   const withdrawalId = useRef<string | null>(null);
   const earningsTrigger = useRef<HTMLElement | null>(null);
   const historyTrigger = useRef<HTMLElement | null>(null);
   const [withdrawn, setWithdrawn] = useState(false);
   const headingId = useId();
   const activities = [
-    { name: '勋章盲盒抽奖', description: '用盲盒券兑换抽奖机会', action: '去看看', icon: Gift, theme: 'gold', select: onSelectMedalLottery },
-    { name: '环球搭子小队', description: '双人组队，完成城市路线', action: '去组队', icon: Users, theme: 'mint', select: onSelectTeamRelay },
-    { name: '百人百城计划', description: '活动筹备中', action: '查看', icon: Globe2, theme: 'violet', select: onSelectHundredCities },
+    { name: '勋章盲盒抽奖', description: '用盲盒券兑换抽奖机会', icon: Gift, theme: 'gold', select: onSelectMedalLottery },
+    { name: '百人百城计划', icon: Globe2, theme: 'violet', select: onSelectHundredCities },
+    { name: '环球搭子小队', description: '双人组队，完成城市路线', icon: Users, theme: 'mint', select: onSelectTeamRelay },
   ];
   const routeCount = Math.min(rewards.today.routes.size, ROUTE_REWARDS.length);
   const amount = tier === 'custom' ? customAmount : tier;
@@ -192,7 +194,8 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
 
   return (
     <>
-      <main className={styles.page} id={earningsOpen || historyTab ? undefined : 'main-content'} aria-label="福利" inert={earningsOpen || !!historyTab || rulesOpen || !!claimedTrack} onScroll={event => setCompact(event.currentTarget.scrollTop >= 64)}>
+      <main className={styles.page} id={earningsOpen || historyTab ? undefined : 'main-content'} aria-label="福利" inert={earningsOpen || !!historyTab || rulesOpen || !!claimedTrack}
+        onScroll={event => setCompact(event.currentTarget.scrollTop >= (walletRef.current?.offsetHeight ?? Infinity))}>
         <div className={styles.stickyAnchor}>
           {compact && <div className={styles.stickyWallet}>
             <div className={styles.stickyBalances}>
@@ -207,18 +210,30 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
           </div>}
         </div>
 
-        <section className={styles.wallet} aria-label="金币钱包">
-          <div className={styles.walletTop}>
-            <button type="button" onClick={event => openHistory('history', event.currentTarget)}><span>金币收益 (金币)<ChevronRight size={13} aria-hidden="true" /></span><strong>{numberFormat.format(rewards.balance)}</strong></button>
-            <button type="button" onClick={event => openHistory('cashHistory', event.currentTarget)}><span>现金收益 (元)<ChevronRight size={13} aria-hidden="true" /></span><strong>{formatCoinValue(rewards.balance)}</strong></button>
-            <div className={styles.coinArt} aria-hidden="true"><i /><i /><i /><b>✦</b></div>
+        <section ref={walletRef} className={styles.wallet} aria-label="金币钱包">
+          <div className={`${styles.walletTop} ${styles.walletSummary}`}>
+            <button type="button" onClick={event => openHistory('history', event.currentTarget)}>
+              <span><Coins className={styles.walletCoin} size={15} aria-hidden="true" />金币收益 (金币)<ChevronRight size={14} aria-hidden="true" /></span>
+              <strong>{numberFormat.format(rewards.balance)}</strong>
+            </button>
+            <button type="button" onClick={event => openHistory('cashHistory', event.currentTarget)}>
+              <span><Wallet className={styles.walletCash} size={15} aria-hidden="true" />现金收益 (元)<ChevronRight size={14} aria-hidden="true" /></span>
+              <strong>{formatCoinValue(rewards.balance)}</strong>
+            </button>
           </div>
           <div className={styles.walletBottom}><span>0点自动兑换成金币</span><button type="button" onClick={openEarnings}>去提现 <ChevronRight size={15} aria-hidden="true" /></button></div>
         </section>
 
         <div className={styles.content}>
           <section className={styles.tasks} aria-labelledby="coin-tasks-title">
-            <header><div><h2 id="coin-tasks-title" ref={tasksHeading} tabIndex={-1}>运动得福利</h2><p>今日已获 <strong>{rewards.today.earned}</strong> / {DAILY_COIN_CAP} 金币</p></div><button className={styles.run} type="button" onClick={onRun}>去跑步</button></header>
+            <header>
+              <div className={styles.tasksSummary}>
+                <h2 id="coin-tasks-title" ref={tasksHeading} tabIndex={-1}>运动得福利</h2>
+                <p>今日已获 <strong>{rewards.today.earned}</strong> / {DAILY_COIN_CAP} 金币</p>
+                <progress className={styles.dailyProgress} aria-label="今日金币奖励进度" value={rewards.today.earned} max={DAILY_COIN_CAP} />
+              </div>
+              <button className={styles.run} type="button" onClick={onRun}>去跑步</button>
+            </header>
             <div className={styles.task}>
               <div className={styles.taskHeading}><span data-theme="mint"><Footprints size={18} aria-hidden="true" /></span><h3>累计运动里程</h3><strong>{(rewards.today.meters / 1000).toLocaleString('zh-CN', { maximumFractionDigits: 3 })} <small>km</small></strong></div>
               <RewardMilestones tiers={MILEAGE_REWARDS} value={rewards.today.meters / 1000} track="mileage" starterClaimed={rewards.starterClaims.has('mileage')} onClaim={() => void claimStarter('mileage')} />
@@ -232,15 +247,19 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
 
           <section className={styles.more} aria-labelledby="more-benefits-title">
             <h2 id="more-benefits-title">更多福利</h2>
-            {activities.map(({ name, description, action, icon: Icon, theme, select }) => (
-              <button key={name} type="button" onClick={select}>
-                <span className={styles.benefitIcon} data-theme={theme}><Icon size={19} aria-hidden="true" /></span>
-                <span className={styles.benefitCopy}><strong>{name}</strong><small>{description}</small></span>
-                <span className={styles.benefitAction} aria-hidden="true">{action}</span>
-              </button>
-            ))}
+            <ul className={styles.benefitList}>
+              {activities.map(({ name, description, icon: Icon, theme, select }) => (
+                <li key={name}>
+                  <button type="button" className={styles.benefitLink} onClick={select}>
+                    <span className={styles.benefitIcon} data-theme={theme}><Icon size={17} aria-hidden="true" /></span>
+                    <span className={styles.benefitCopy}><strong>{name}</strong>{description && <small>{description}</small>}</span>
+                    <ChevronRight className={styles.benefitChevron} size={16} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
           </section>
-          <p className={styles.footer}>如有疑问，请查看<button type="button" onClick={() => setRulesOpen(true)}>《活动规则》</button></p>
+          <p className={styles.footer}><button type="button" onClick={() => setRulesOpen(true)}>活动规则 <ChevronRight size={13} aria-hidden="true" /></button></p>
         </div>
       </main>
 
@@ -340,9 +359,24 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
         <Modal labelId={headingId} onClose={() => setRulesOpen(false)} className={styles.sheet} backdropClassName={styles.backdrop}>
           <header className={styles.sheetHeader}><h2 id={headingId}>活动规则</h2><button type="button" onClick={() => setRulesOpen(false)} aria-label="关闭活动规则"><X size={21} aria-hidden="true" /></button></header>
           <ol className={styles.rules}>
-            <li>预览中，里程和路线通关的首档奖励可直接领取，各计入当日奖励一次。其余奖励达标后在运动结算时自动入账，单日最多 {DAILY_COIN_CAP} 金币（{formatCoinValue(DAILY_COIN_CAP)}）。</li>
-            <li>同一路线当日只计一次通关，重跑的有效里程照常累计。通关须达到计划里程的 90%，且运动满 15 分钟。</li>
-            <li>按北京时间刷新每日任务，已入账金币继续保留。10,000 金币兑 ¥1，微信钱包模拟提现支持 ¥1、¥3、¥5 固定档位和自定义金额。</li>
+            <li>
+              <strong>里程奖励。</strong>以运动设备记录的有效里程为准。
+              当日累计达到 {MILEAGE_REWARDS.map(({ goal, coins }) => `${goal} 公里奖励 ${coins} 金币`).join('、')}。
+            </li>
+            <li>
+              <strong>路线通关奖励。</strong>完整播放一条路线的视频至结束即为通关，提前退出不计。
+              同一路线当天只计一次，次日可重新计入。
+              当天通关不同路线，{ROUTE_REWARDS.map(({ goal, coins }) => `第 ${goal} 条奖励 ${coins} 金币`).join('、')}。
+            </li>
+            <li>
+              <strong>奖励结算。</strong>里程和通关奖励可叠加，达标后在结算时自动入账，每档每天只发放一次。
+              每人每天最多获得 {DAILY_COIN_CAP} 金币。每日任务于北京时间 0 点重置，已入账金币继续保留。
+            </li>
+            <li>
+              <strong>兑换与提现。</strong>{numberFormat.format(COINS_PER_YUAN)} 金币固定兑换 ¥1。
+              微信钱包提现可选 {WITHDRAWAL_TIERS.map(amount => `¥${amount}`).join('、')} 或自定义金额。
+              提现金额不得超过可提现余额，提交申请后 1–3 个工作日内到账。
+            </li>
           </ol>
         </Modal>
       )}

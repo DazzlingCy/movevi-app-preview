@@ -1,25 +1,25 @@
 import { useLayoutEffect, useRef } from 'react';
 import {
-  Activity, AlarmClock, BatteryCharging, BriefcaseBusiness, Building2, CalendarDays, Check,
-  CircleDashed, Clock3, CloudRain, CloudSun, Coffee, Droplets, Flag, Flame, Footprints, Gauge, Headphones,
-  GalleryHorizontalEnd, HeartPulse, House, Landmark, Leaf, MessageCircle, Moon, MoonStar, Mountain, MountainSnow, PartyPopper,
-  PawPrint, Podcast, Route, Signpost, Smile, Snowflake, Sun, Sunrise, Sunset, Target, TimerReset, Trophy,
+  Activity, AlarmClock, BatteryCharging, Building2, CalendarDays, Check,
+  CircleDashed, Clock3, CloudRain, CloudSun, Coffee, Droplets, Flame, Footprints, Gauge, Headphones,
+  GalleryHorizontalEnd, HeartPulse, House, Landmark, Leaf, Moon, MoonStar, Mountain, MountainSnow,
+  Podcast, Route, Signpost, Smile, Snowflake, Sun, Sunrise, Sunset, Target, TimerReset,
   UsersRound, Waves, Wind, Zap, Trees, type LucideIcon,
 } from 'lucide-react';
-import { QUICK_RUN_SCENES, RUN_SCENE_GROUPS, type RunScene } from '../journey/runScenes';
+import { CITY_CARD_MODE_LABEL, QUICK_RUN_SCENES, RUN_SCENE_GROUPS, type RunScene } from '../journey/runScenes';
 import styles from './RunSceneView.module.css';
 
 const groupIcons = { time: Clock3, outdoors: Mountain, indoors: House, training: Activity, mood: Smile, company: UsersRound };
-const quickIcons = [Footprints, BriefcaseBusiness];
+
 const sceneIcons = {
   morning: Coffee, sunrise: Sunrise, alarm: AlarmClock, sun: Sun, sunset: Sunset, moon: Moon, night: MoonStar,
   flame: Flame, weekend: CalendarDays, river: Waves, trees: Trees, lake: Droplets,
   mountain: MountainSnow, wind: Wind, track: CircleDashed, city: Building2, rain: CloudRain, leaf: Leaf,
   trail: Signpost, heritage: Landmark, home: House, interval: TimerReset, steps: Footprints, pulse: HeartPulse,
-  snow: Snowflake, speed: Zap, distance: Route, pace: Gauge, target: Target, finish: Flag, trophy: Trophy,
-  clear: CloudSun, smile: Smile, battery: BatteryCharging, dialogue: MessageCircle, celebrate: PartyPopper,
-  audio: Headphones, friends: UsersRound, pet: PawPrint, podcast: Podcast,
-} satisfies Record<(typeof RUN_SCENE_GROUPS)[number]['scenes'][number]['symbol'], LucideIcon>;
+  snow: Snowflake, speed: Zap, distance: Route, pace: Gauge, target: Target,
+  clear: CloudSun, smile: Smile, battery: BatteryCharging,
+  audio: Headphones, friends: UsersRound, podcast: Podcast,
+} satisfies Record<(typeof RUN_SCENE_GROUPS)[number]['scenes'][number]['symbol'] | (typeof QUICK_RUN_SCENES)[number]['symbol'], LucideIcon>;
 
 interface Props {
   selection: RunScene | null;
@@ -66,13 +66,13 @@ export default function RunSceneView({ selection, onSelect, onClose }: Props) {
             <div className={styles.quick}>
               <button className={styles.cityMode} type="button" aria-pressed={selection === null} aria-description="按城市浏览跑步路线" onClick={() => onSelect(null)}>
                 <GalleryHorizontalEnd size={20} strokeWidth={2} aria-hidden="true" />
-                <span>城市卡片模式</span>
+                <span>{CITY_CARD_MODE_LABEL}</span>
                 {selection === null && <Check className={styles.quickCheck} size={16} aria-hidden="true" />}
               </button>
-              {QUICK_RUN_SCENES.map(({ scene, hint }, index) => {
-                const Icon = quickIcons[index];
+              {QUICK_RUN_SCENES.map(scene => {
+                const Icon = sceneIcons[scene.symbol];
                 const active = selection === scene;
-                return <button key={scene.label} type="button" aria-pressed={active} aria-description={hint} onClick={() => onSelect(scene)}>
+                return <button key={scene.label} type="button" aria-pressed={active} aria-description={`目标 ${scene.targetMinutes} 分钟，${scene.speedPlan}`} onClick={() => onSelect(scene)}>
                   <Icon size={19} strokeWidth={2} aria-hidden="true" />
                   <span>{scene.label}</span>
                   {active && <Check className={styles.quickCheck} size={16} aria-hidden="true" />}

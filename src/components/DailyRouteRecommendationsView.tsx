@@ -1,12 +1,14 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { getRouteCategory } from '../data/routeCategories';
 import { getRouteCover } from '../data/routeCovers';
 import type { DailyRouteRecommendation } from '../journey/routeRecommendations';
+import type { RunScene } from '../journey/runScenes';
 import type { JourneyCity, JourneyRoute } from '../journey/types';
 import { resolveRecommendationCover } from '../lib/localImages';
 import CityImage from './CityImage';
 import RouteCardRail from './RouteCardRail';
 import StickyHeroNav, { HeroBackButton } from './StickyHeroNav';
+import treadmillCover from './run-scene-treadmill.svg';
 import styles from './DailyRouteRecommendationsView.module.css';
 
 type Props = {
@@ -14,8 +16,8 @@ type Props = {
   recommendations: DailyRouteRecommendation[];
   onRouteClick: (route: JourneyRoute, position: number) => void;
 } & (
-  | { day: string; onBack: () => void; scrollTop: number; sceneName?: never; homeControls?: never; routeIndex?: never; onRouteIndexChange?: never }
-  | { sceneName: string; homeControls: ReactNode; routeIndex: number; onRouteIndexChange: (index: number) => void; day?: never; onBack?: never; scrollTop?: never }
+  | { day: string; onBack: () => void; scrollTop: number; scene?: never; homeControls?: never; routeIndex?: never; onRouteIndexChange?: never; onOpenRunScenes?: never }
+  | { scene: RunScene; homeControls: ReactNode; routeIndex: number; onRouteIndexChange: (index: number) => void; onOpenRunScenes: () => void; day?: never; onBack?: never; scrollTop?: never }
 );
 
 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
@@ -25,13 +27,24 @@ const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
   weekday: 'long',
 });
 
-export default function DailyRouteRecommendationsView({ cityImageFor, day, sceneName, homeControls, recommendations, routeIndex, onRouteIndexChange, scrollTop, onBack, onRouteClick }: Props) {
+function getSceneBackdropStyle(scene: RunScene): CSSProperties {
+  const { backdrop, backdropHue } = scene;
+  const image = backdrop === 'treadmill' ? treadmillCover
+    : resolveRecommendationCover(getRouteCover(...backdrop)?.src, 'feature');
+  return {
+    '--scene-background-hue': backdropHue,
+    '--scene-background-image': image ? `url("${image}")` : 'none',
+  } as CSSProperties;
+}
+
+export default function DailyRouteRecommendationsView({ cityImageFor, day, scene, homeControls, recommendations, routeIndex, onRouteIndexChange, onOpenRunScenes, scrollTop, onBack, onRouteClick }: Props) {
   const pageRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     if (pageRef.current) pageRef.current.scrollTop = scrollTop ?? 0;
-  }, [sceneName, scrollTop]);
+  }, [scene, scrollTop]);
 
-  const isScene = sceneName !== undefined;
+  const isScene = scene !== undefined;
+  const backdropStyle = scene && getSceneBackdropStyle(scene);
   const priorityIndex = routeIndex ?? 0;
   const cards = recommendations.map(({ city, route }, index) => {
     const featured = isScene || index === 0;
@@ -68,20 +81,23 @@ export default function DailyRouteRecommendationsView({ cityImageFor, day, scene
   });
 
   return (
-    <main ref={pageRef} className={isScene ? `${styles.page} ${styles.sceneHome}` : styles.page} id="main-content">
-      {sceneName !== undefined ? <header className={styles.homeBar}>{homeControls}</header> : (
+    <main ref={pageRef} className={isScene ? `${styles.page} ${styles.sceneHome}` : styles.page} style={backdropStyle} id="main-content">
+      {scene ? <header className={styles.homeBar}>{homeControls}</header> : (
         <StickyHeroNav overlapHero={false}>
           <HeroBackButton label="返回首页" onClick={onBack} />
         </StickyHeroNav>
       )}
       <div className={styles.content}>
         <header className={styles.listHeader}>
-          <h1>{sceneName ?? '每日推荐'}</h1>
+          <h1>{scene?.label ?? '每日推荐'}</h1>
           {day && <time dateTime={day}>{dateFormatter.format(new Date(day))}</time>}
         </header>
-        {!cards.length ? <p className={styles.empty}>{isScene ? '暂无可跑路线' : '今日暂无推荐路线'}</p> : isScene ? (
-          <div key={sceneName} className={styles.sceneRail} aria-label="场景推荐路线">
-            <RouteCardRail items={cards} initialIndex={routeIndex} onSelect={onRouteIndexChange} />
+        {scene && (
+          <p className={styles.scenePlan}>目标 {scene.targetMinutes} 分钟 <span aria-hidden="true">·</span> {scene.speedPlan}</p>
+        )}
+        {!cards.length ? <p className={styles.empty}>{isScene ? '暂无可跑路线' : '今日暂无推荐路线'}</p> : scene ? (
+          <div key={`routes-${scene.label}`} className={styles.sceneRail} aria-label="场景推荐路线">
+            <RouteCardRail items={cards} initialIndex={routeIndex} onSelect={onRouteIndexChange} onSwipePastStart={onOpenRunScenes} />
           </div>
         ) : (
           <ul className={styles.routes} aria-label="每日推荐路线">

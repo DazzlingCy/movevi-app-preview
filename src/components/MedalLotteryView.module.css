@@ -1,0 +1,139 @@
+.page {
+  --lottery-bg: #14131a;
+  --lottery-ink: #f7f3eb;
+  --lottery-muted: #bcb5c0;
+  --lottery-gold: #f6d999;
+  --lottery-line: #ffffff20;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--lottery-bg);
+  color: var(--lottery-ink);
+}
+
+.screen { display: flex; flex-direction: column; height: 100%; }
+.nav {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) clamp(12px, 4vw, 22px) 10px;
+  border-bottom: 1px solid var(--lottery-line);
+}
+.nav h1 { margin: 0; font-size: 17px; font-weight: 750; text-align: center; }
+.iconButton {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.page button:focus-visible { outline: 2px solid var(--lottery-gold); outline-offset: 2px; }
+.iconButton:active { background: #ffffff16; }
+.scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #655761 transparent;
+  padding: 14px clamp(12px, 4vw, 22px) max(30px, env(safe-area-inset-bottom));
+}
+
+.hero {
+  padding: clamp(14px, 4.5vw, 26px);
+  border: 1px solid #f6d99938;
+  border-radius: 22px;
+  background: radial-gradient(ellipse at 96% 0%, #5b422c, transparent 56%), #24202b;
+}
+.heroIntro { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.heroIntro h2 { margin: 0; font-size: clamp(24px, 7.6vw, 36px); font-weight: 850; line-height: 1.12; }
+.heroIntro h2 span { display: block; color: var(--lottery-gold); }
+.heroIntro p { max-width: 22em; margin: 8px 0 0; color: #e4d8c9; font-size: 13px; line-height: 1.55; }
+.emblem {
+  display: grid;
+  width: clamp(64px, 22vw, 106px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid #edc281;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #fff0bf, #e0ac67 72%, #9b633b);
+  box-shadow: inset 0 0 0 5px #71432545, inset 0 0 0 7px #f8e2ad70, 0 8px 18px #150e1866;
+  color: #50321f;
+}
+.emblem svg { width: 46%; height: auto; }
+.stats { display: grid; grid-template-columns: 1.18fr 1fr 1fr; margin: 16px 0 0; padding: 12px 0; border-block: 1px solid var(--lottery-line); }
+.stats > div { min-width: 0; padding-inline: clamp(6px, 2.4vw, 14px); }
+.stats > div:first-child { padding-inline-start: 0; }
+.stats > div + div { border-inline-start: 1px solid var(--lottery-line); }
+.stats dt { color: var(--lottery-muted); font-size: 11px; line-height: 1.4; }
+.stats dd { margin: 3px 0 0; font-size: clamp(19px, 5.7vw, 28px); font-weight: 750; line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stats .ticketBalance dd { color: var(--lottery-gold); }
+.stats small { font-size: 11px; font-weight: 650; }
+.actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 15px; }
+.primary, .secondary {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.primary { background: var(--lottery-gold); color: #332215; }
+.primary:active { background: #eac486; }
+.secondary { border-color: #d3b38270; background: transparent; color: var(--lottery-gold); cursor: default; }
+
+.schedule { display: flex; align-items: flex-start; gap: 10px; margin: 0 2px; padding: 15px 0; border-bottom: 1px solid var(--lottery-line); }
+.schedule svg { flex: none; color: var(--lottery-gold); }
+.schedule h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; font-size: 13px; font-weight: 750; }
+.schedule span { font-size: 12px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.schedule p, .poolSummary { margin: 4px 0 0; color: var(--lottery-muted); font-size: 12px; line-height: 1.5; }
+.details { margin: 20px 2px 0; }
+.details h2 { margin: 0; font-size: 18px; font-weight: 750; }
+.sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.steps { margin: 7px 0 0; padding: 0; list-style: none; }
+.steps li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--lottery-line); }
+.stepNumber { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: #342a2d; color: var(--lottery-gold); font-size: 11px; font-weight: 750; }
+.steps h3 { margin: 0; font-size: 14px; font-weight: 700; }
+.steps p { margin: 2px 0 0; color: var(--lottery-muted); font-size: 12px; line-height: 1.45; }
+.textButton { min-height: 44px; padding: 0 8px; border: 0; border-radius: 8px; background: #ffffff0c; color: var(--lottery-gold); font-size: 12px; font-weight: 650; white-space: nowrap; }
+.textButton:active { background: #ffffff1b; }
+.prizes { width: 100%; margin-top: 9px; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; text-align: left; }
+.prizes :is(th, td) { padding: 9px 0; border-bottom: 1px solid var(--lottery-line); }
+.prizes thead { color: var(--lottery-muted); font-size: 11px; }
+.prizes :is(th, td):last-child { text-align: right; }
+.prizes td:nth-child(2) { color: var(--lottery-gold); font-weight: 700; }
+
+.backdrop:global(.modal-backdrop) { z-index: 3; align-items: center; justify-content: center; padding: 16px; }
+.dialog:global(.modal-sheet) { width: min(100%, 320px); padding: 18px; border-radius: 22px; background: #24202b; color: var(--lottery-ink); }
+.dialog:global(.modal-sheet)::before { content: none; }
+.dialog h2 { margin: 0; font-size: 19px; font-weight: 750; }
+.result { text-align: center; }
+.result > svg { margin: 10px auto; color: var(--lottery-gold); }
+.result > strong { display: block; margin: 7px 0 18px; color: var(--lottery-gold); font-size: 40px; }
+.result > button { width: 100%; }
+.toast {
+  position: absolute;
+  z-index: 4;
+  inset: max(70px, calc(env(safe-area-inset-top) + 65px)) 16px auto;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  margin: 0 auto;
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: #f7edda;
+  color: #332215;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
