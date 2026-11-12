@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type CSSProperties } from 'react';
-import { Check, ChevronLeft, ChevronRight, Coins, Footprints, Gift, Globe2, Route, Users, Wallet, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Coins, Footprints, Gift, Globe2, Route, Sparkle, Users, Wallet, X } from 'lucide-react';
 import { COINS_PER_YUAN, DAILY_COIN_CAP, MILEAGE_REWARDS, ROUTE_REWARDS, STARTER_COIN_REWARDS, WITHDRAWAL_TIERS, formatCoinValue, parseWithdrawalCoins, type CoinEntry, type CoinTrack, type WithdrawalTier } from '../journey/coinRewards';
 import type { useCoinRewards } from '../journey/useCoinRewards';
 import Modal from './journey/Modal';
@@ -39,28 +39,28 @@ function RewardMilestones({ tiers, value, track, starterClaimed, onClaim }: {
   onClaim: () => void;
 }) {
   const current = tiers.findIndex((tier, index) => value < tier.goal && !(index === 0 && starterClaimed));
+  const isMileage = track === 'mileage';
   return (
-    <ol className={styles.milestones}>
+    <ol className={`${styles.milestones} ${isMileage ? styles.mileageTimeline : styles.routeRewards}`}>
       {tiers.map((tier, index) => {
         const reached = value >= tier.goal || (index === 0 && starterClaimed);
         const claimable = index === 0 && !reached;
         const goal = track === 'route' ? `第 ${tier.goal} 条` : `${tier.goal} km`;
+        const next = tiers[index + 1];
+        const segmentProgress = next ? Math.max(0, Math.min(1, (value - tier.goal) / (next.goal - tier.goal))) : 0;
         const tileContent = (
           <>
-            <span className={styles.tierGoal}>{goal}</span>
-            <span className={styles.tierCoins}>
-              <Coins className={styles.tierCoinIcon} size={13} aria-hidden="true" />
-              +{tier.coins}<span className={styles.srOnly}> 金币{reached ? '，已入账' : ''}</span>
+            <span className={styles.tierReward}>
+              <span className={styles.tierCoins}>+{tier.coins}<span className={styles.srOnly}> 金币{reached ? '，已入账' : ''}</span></span>
+              <span className={styles.tierCoinIcon} aria-hidden="true"><Sparkle size={10} /></span>
             </span>
-            {(claimable || reached) && (
-              <span className={styles.rewardStatus} aria-hidden="true">
-                {reached ? <><Check size={10} strokeWidth={2.5} />已领取</> : '领取'}
-              </span>
-            )}
+            {isMileage && <span className={styles.timelineDot} aria-hidden="true" />}
+            <span className={styles.tierGoal}>{goal}</span>
           </>
         );
         return (
-          <li key={tier.goal} data-reached={reached} data-claimable={claimable} aria-current={index === current ? 'step' : undefined}>
+          <li key={tier.goal} data-reached={reached} data-claimable={claimable} aria-current={index === current ? 'step' : undefined}
+            style={isMileage && next ? { '--segment-progress': `${segmentProgress * 100}%` } as CSSProperties : undefined}>
             {claimable ? <button type="button" className={styles.rewardTile} aria-label={`领取${trackNames[track]} ${goal} 奖励，${tier.coins} 金币`} onClick={onClaim}>{tileContent}</button>
               : <span className={styles.rewardTile}>{tileContent}</span>}
           </li>

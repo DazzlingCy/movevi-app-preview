@@ -90,45 +90,90 @@
 .taskHeading > strong { color: #28604e; font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .taskHeading small { color: var(--benefits-muted); font-size: 11px; font-weight: 600; }
 .milestones {
+  --milestone-gap: 8px;
+  --milestone-gold: #9a4d0c;
+  --milestone-track: #f1e5ce;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
-  gap: 6px;
-  margin: 9px 0 0;
+  gap: var(--milestone-gap);
+  margin: 12px 0 0;
   padding: 0;
   list-style: none;
 }
-.milestones li { min-width: 0; }
+.milestones li { position: relative; min-width: 0; }
 .rewardTile {
+  position: relative;
   display: grid;
-  grid-template-rows: 15px 18px 14px;
   justify-items: center;
   align-items: center;
-  gap: 3px;
   width: 100%;
-  min-height: 68px;
-  padding: 6px 2px;
-  border: 1px solid #e9eeea;
-  border-radius: 10px;
-  background: #f6f8f6;
-  color: #46564f;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--benefits-muted);
 }
-.milestones li[data-claimable='true'] .rewardTile {
-  border-color: #efcb87;
-  background: #fff3da;
-  color: #784510;
+.tierReward {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #f2e6d0;
+  background: #fff7e9;
+  color: var(--milestone-gold);
 }
-.milestones li[data-reached='true'] .rewardTile {
+.milestones li[data-claimable='true'] .tierReward {
+  border-color: #edbd74;
+  background: #ffebc5;
+}
+.milestones li[data-reached='true'] .tierReward {
   border-color: #dcece4;
   background: #edf7f1;
   color: #28604e;
 }
 .tierGoal { font-size: 11px; font-weight: 600; white-space: nowrap; }
-.tierCoins { display: inline-flex; align-items: center; gap: 3px; font-size: 15px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; }
-.tierCoinIcon { flex: none; color: currentColor; }
-.rewardStatus { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; line-height: 1; white-space: nowrap; }
-.milestones button.rewardTile { cursor: pointer; transition: background-color .18s ease; }
-.milestones li[data-claimable='true'] button.rewardTile:active { background: #ffe8b9; }
+.tierCoins { font-size: 15px; line-height: 1; font-weight: 750; font-variant-numeric: tabular-nums; }
+.tierCoinIcon {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  place-items: center;
+  border: 1px solid #d89a43;
+  border-radius: 50%;
+  background: linear-gradient(150deg, #ffeb9f, #f7be61);
+  color: #884711;
+}
+.tierCoinIcon svg { fill: currentColor; }
+.milestones button.rewardTile { cursor: pointer; }
+.milestones button.rewardTile:active .tierReward { background: #ffdfa6; }
+
+.mileageTimeline {
+  --mileage-slot: clamp(60px, 16vw, 68px);
+  display: flex;
+  gap: 0;
+}
+.mileageTimeline li { flex: 1; }
+.mileageTimeline li:last-child { flex: 0 0 var(--mileage-slot); }
+.mileageTimeline .rewardTile { width: var(--mileage-slot); grid-template-rows: 27px 8px 14px; row-gap: 6px; }
+.mileageTimeline .tierReward { flex-direction: row-reverse; gap: 3px; width: 100%; min-height: 27px; padding: 3px; border-radius: 7px; }
+.mileageTimeline .tierCoins { font-size: 13px; }
+.mileageTimeline li:not(:last-child)::before {
+  position: absolute;
+  top: 36px;
+  inset-inline-start: calc(var(--mileage-slot) / 2);
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #d99545 var(--segment-progress), var(--milestone-track) 0);
+  content: '';
+}
+.timelineDot { z-index: 1; width: 8px; height: 8px; border: 2px solid #f3e4ca; border-radius: 50%; background: #fff; }
+.mileageTimeline [data-claimable='true'] .timelineDot { border-color: #d99545; background: #ffefcf; }
+.mileageTimeline [data-reached='true'] .timelineDot { border-color: #4a896c; background: #4a896c; }
+
+.routeRewards .rewardTile { grid-template-rows: 62px 14px; row-gap: 5px; }
+.routeRewards .tierReward { flex-direction: column; gap: 6px; width: 100%; height: 100%; border-radius: 10px; }
+.routeRewards .tierCoinIcon { width: 22px; height: 13px; margin-bottom: 4px; box-shadow: 0 2px #e7ae51, 0 4px #c98632; }
 .claimError { margin: 0 0 12px; color: #a1301b; font-size: 12px; }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .more { padding: 14px 14px 5px; }
