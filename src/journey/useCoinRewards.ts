@@ -7,7 +7,9 @@ declare const __APP_VERSION__: string;
 export function useCoinRewards(demo: boolean) {
   // Vite preview serves a production build, including over the local network.
   const localPreview = __APP_VERSION__.startsWith('local-');
-  const trackWorkouts = localPreview || demo;
+  const hostedPreview = window.location.hostname === 'dazzlingcy.github.io'
+    && window.location.pathname.startsWith('/movevi-app-preview');
+  const trackWorkouts = localPreview || hostedPreview || demo;
   const key = demo ? 'movevi-coins-demo-v1' : 'movevi-coins-v1';
   const read = () => readCoinLedger(localStorage.getItem(key));
   const [ledger, setLedger] = useState<CoinLedger>(() => {
