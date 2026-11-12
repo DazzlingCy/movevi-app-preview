@@ -9,11 +9,12 @@ export function useCoinRewards(demo: boolean) {
   const localPreview = __APP_VERSION__.startsWith('local-');
   const hostedPreview = window.location.hostname === 'dazzlingcy.github.io'
     && window.location.pathname.startsWith('/movevi-app-preview');
-  const trackWorkouts = localPreview || hostedPreview || demo;
+  const transientPreview = localPreview || hostedPreview;
+  const trackWorkouts = transientPreview || demo;
   const key = demo ? 'movevi-coins-demo-v1' : 'movevi-coins-v1';
   const read = () => readCoinLedger(localStorage.getItem(key));
   const [ledger, setLedger] = useState<CoinLedger>(() => {
-    if (localPreview) return [];
+    if (transientPreview) return [];
     try { return read(); } catch { return []; }
   });
   const latest = useRef(ledger);
@@ -22,7 +23,7 @@ export function useCoinRewards(demo: boolean) {
   useEffect(() => {
     const refreshDay = () => setNow(Date.now());
     const sync = (event: StorageEvent) => {
-      if (localPreview || event.key !== key) return;
+      if (transientPreview || event.key !== key) return;
       latest.current = readCoinLedger(event.newValue);
       setLedger(latest.current);
       refreshDay();
@@ -35,17 +36,17 @@ export function useCoinRewards(demo: boolean) {
       window.removeEventListener('focus', refreshDay);
       window.removeEventListener('storage', sync);
     };
-  }, [key, localPreview]);
+  }, [key, transientPreview]);
 
   const currentLedger = () => {
-    if (localPreview) return latest.current;
+    if (transientPreview) return latest.current;
     try { return read(); } catch { return latest.current; }
   };
   const update = (apply: (previous: CoinLedger) => CoinLedger) => {
     const previous = currentLedger();
     const next = apply(previous);
     if (next === previous) return false;
-    if (!localPreview) {
+    if (!transientPreview) {
       try { localStorage.setItem(key, JSON.stringify(next)); } catch { return false; }
     }
     latest.current = next;
@@ -69,7 +70,7 @@ export function useCoinRewards(demo: boolean) {
     starterClaims,
     async claimStarter(track: CoinTrack) {
       const claim = () => update(previous => recordStarterClaim(previous, track, Date.now()));
-      return !localPreview && navigator.locks ? navigator.locks.request(key, claim) : claim();
+      return !transientPreview && navigator.locks ? navigator.locks.request(key, claim) : claim();
     },
     preview: (workout: CoinWorkout) => trackWorkouts ? settleCoinWorkout(ledger, workout)?.reward : undefined,
     progress: (workout: CoinWorkout) => trackWorkouts ? coinWorkoutProgress(ledger, workout) : undefined,
