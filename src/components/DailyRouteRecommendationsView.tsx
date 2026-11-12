@@ -8,7 +8,6 @@ import { resolveRecommendationCover } from '../lib/localImages';
 import CityImage from './CityImage';
 import RouteCardRail from './RouteCardRail';
 import StickyHeroNav, { HeroBackButton } from './StickyHeroNav';
-import treadmillCover from './run-scene-treadmill.svg';
 import styles from './DailyRouteRecommendationsView.module.css';
 
 type Props = {
@@ -27,16 +26,6 @@ const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
   weekday: 'long',
 });
 
-function getSceneBackdropStyle(scene: RunScene): CSSProperties {
-  const { backdrop, backdropHue } = scene;
-  const image = backdrop === 'treadmill' ? treadmillCover
-    : resolveRecommendationCover(getRouteCover(...backdrop)?.src, 'feature');
-  return {
-    '--scene-background-hue': backdropHue,
-    '--scene-background-image': image ? `url("${image}")` : 'none',
-  } as CSSProperties;
-}
-
 export default function DailyRouteRecommendationsView({ cityImageFor, day, scene, homeControls, recommendations, routeIndex, onRouteIndexChange, onOpenRunScenes, scrollTop, onBack, onRouteClick }: Props) {
   const pageRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -44,7 +33,7 @@ export default function DailyRouteRecommendationsView({ cityImageFor, day, scene
   }, [scene, scrollTop]);
 
   const isScene = scene !== undefined;
-  const backdropStyle = scene && getSceneBackdropStyle(scene);
+  const backdropStyle = scene && { '--scene-background-hue': scene.backdropHue } as CSSProperties;
   const priorityIndex = routeIndex ?? 0;
   const cards = recommendations.map(({ city, route }, index) => {
     const featured = isScene || index === 0;

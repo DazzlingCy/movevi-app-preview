@@ -30,16 +30,7 @@
   background-image:
     radial-gradient(ellipse at 6% 13%, #090b13c2, transparent 62%),
     radial-gradient(ellipse at 100% 29%,
-      color-mix(in srgb, var(--scene-background-glow) 30%, transparent), transparent 60%),
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--scene-background-tone) 62%, transparent),
-      color-mix(in srgb, var(--scene-background-tone) 18%, transparent) 43%,
-      color-mix(in srgb, var(--scene-background-tone) 40%, transparent) 75%,
-      color-mix(in srgb, var(--scene-background-tone) 86%, transparent)),
-    var(--scene-background-image);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
+      color-mix(in srgb, var(--scene-background-glow) 30%, transparent), transparent 60%);
 }
 .homeBar {
   position: sticky;
