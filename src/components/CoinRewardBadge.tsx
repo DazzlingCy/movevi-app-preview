@@ -57,9 +57,11 @@ export default function CoinRewardBadge({ coins, fraction, className = '', varia
             : <strong key={coins} data-counting={burst > 0}>{receipt ? '+' : ''}{coins}</strong>}
         </span>
       </div>
-      <span className={styles.caption} role={receipt ? 'status' : undefined}>
-        {receipt ? <><span className={styles.srOnly}>获得 {coins} 金币，</span>金币已入账</> : live ? '里程换算' : '预计金币'}
-      </span>
+      {!live && (
+        <span className={styles.caption} role={receipt ? 'status' : undefined}>
+          {receipt ? <><span className={styles.srOnly}>获得 {coins} 金币，</span>金币已入账</> : '预计金币'}
+        </span>
+      )}
       {burst > 0 && (
         <span className={styles.burst} key={coins} aria-hidden="true">
           <i>✦</i><i>✦</i><i>✦</i>
