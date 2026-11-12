@@ -1838,14 +1838,18 @@ body { background: var(--bg); }
 /* Legacy profile information architecture, restyled for the current shell. */
 .profile-page--legacy { overflow-y: auto; scrollbar-width: none; }
 .profile-page--legacy::-webkit-scrollbar { display: none; }
-.legacy-profile-actions { min-height: 38px; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 22px; }
-.legacy-profile-actions > div { display: flex; gap: 8px; }
-.legacy-profile-actions button { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 11px; background: #101116; color: #979ba5; }
+.legacy-profile-actions { display: flex; align-self: start; align-items: center; gap: 2px; margin: -4px -6px 0 0; }
+.legacy-profile-actions button { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 11px; background: transparent; color: #a6aab4; }
 .legacy-profile-actions button:active { background: #181a20; transform: scale(.97); }
 .legacy-profile-actions button svg { width: 16px; height: 16px; stroke-width: 1.8; }
 
 .legacy-profile-card { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #0f1014; }
-.legacy-profile-card__identity { display: flex; align-items: center; gap: 14px; padding: 20px 18px 17px; }
+.legacy-profile-card__identity { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 20px 18px 17px; }
+@media (max-width: 360px) {
+  .legacy-profile-card__identity { gap: 8px; padding-inline: 12px; }
+  .legacy-profile-card__identity .legacy-avatar { width: 48px; height: 48px; border-radius: 16px; }
+  .profile-page--legacy .legacy-profile-card__identity h1 { font-size: 22px; }
+}
 .legacy-avatar { width: 62px; height: 62px; flex: 0 0 auto; overflow: hidden; padding: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 20px; background: #20222a; }
 .legacy-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; filter: saturate(.78) contrast(.96); }
 .legacy-profile-card__identity > div { min-width: 0; }

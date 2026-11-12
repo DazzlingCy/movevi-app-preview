@@ -1343,18 +1343,16 @@ function ProfilePage({
   ];
   return (
     <main className="page profile-page profile-page--legacy" id="main-content">
-      <header className="legacy-profile-actions">
-        <div>
-          <button type="button" onClick={() => onFeature('消息')} aria-label="消息"><Mail /></button>
-          <button type="button" onClick={() => onFeature('编辑资料')} aria-label="编辑资料"><SquarePen /></button>
-        </div>
-      </header>
       <section className="legacy-profile-card">
         <div className="legacy-profile-card__identity">
           <button type="button" className="legacy-avatar" onClick={() => onFeature('编辑资料')} aria-label="查看或编辑资料">
             <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200" alt="沐小六的头像" />
           </button>
           <div><h1>沐小六</h1><button className="legacy-profile-level" type="button" onClick={onLevel} aria-label={`查看环球等级，当前 LV.${countryLevel.level}，最高 LV.${countryLevel.maxLevel}`}><span>LV.{countryLevel.level}</span><strong>/ {countryLevel.maxLevel}</strong><ChevronRight /></button></div>
+          <div className="legacy-profile-actions" aria-label="个人资料操作">
+            <button type="button" onClick={() => onFeature('消息')} aria-label="消息"><Mail /></button>
+            <button type="button" onClick={() => onFeature('编辑资料')} aria-label="编辑资料"><SquarePen /></button>
+          </div>
         </div>
         <div className="legacy-profile-stats">
           {profileStats.map(item => <div key={item.label}><strong>{item.value}{item.unit && <small>{item.unit}</small>}</strong><span>{item.label}</span></div>)}
