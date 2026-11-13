@@ -2,8 +2,8 @@ import { exerciseDay } from './dailyExercise';
 
 export const COINS_PER_YUAN = 10_000;
 const COINS_PER_CENT = COINS_PER_YUAN / 100;
-export const MILEAGE_REWARDS = [{ goal: 1, coins: 80 }, { goal: 3, coins: 80 }, { goal: 5, coins: 100 }, { goal: 10, coins: 120 }] as const;
-export const ROUTE_REWARDS = [{ goal: 1, coins: 80 }, { goal: 2, coins: 100 }, { goal: 3, coins: 120 }] as const;
+export const MILEAGE_REWARDS = [{ goal: 1, coins: 120 }, { goal: 2, coins: 100 }, { goal: 3, coins: 80 }] as const;
+export const ROUTE_REWARDS = [{ goal: 1, coins: 120 }, { goal: 2, coins: 100 }, { goal: 3, coins: 80 }] as const;
 export const DAILY_COIN_CAP = [...MILEAGE_REWARDS, ...ROUTE_REWARDS].reduce((total, tier) => total + tier.coins, 0);
 export const WITHDRAWAL_TIERS = [1, 3, 5] as const;
 export type WithdrawalTier = typeof WITHDRAWAL_TIERS[number];
@@ -130,13 +130,16 @@ export function coinWorkoutProgress(ledger: CoinLedger, workout: CoinWorkout) {
 }
 
 export function coinMileageCounter(meters: number) {
-  const { goal, coins } = STARTER_COIN_REWARDS.mileage;
-  const segmentMeters = goal * 1000;
-  const segmentProgress = meters > 0 ? ((meters - 1) % segmentMeters) + 1 : 0;
-  return {
-    coins: Math.floor(meters * coins / segmentMeters),
-    fraction: segmentProgress / segmentMeters,
-  };
+  let coins = 0;
+  let previousMeters = 0;
+  for (const tier of MILEAGE_REWARDS) {
+    const goalMeters = tier.goal * 1000;
+    const fraction = Math.max(0, Math.min(1, (meters - previousMeters) / (goalMeters - previousMeters)));
+    coins += Math.floor(fraction * tier.coins);
+    if (meters <= goalMeters) return { coins, fraction };
+    previousMeters = goalMeters;
+  }
+  return { coins, fraction: 1 };
 }
 
 function isWithdrawalCoinAmount(coins: number) {

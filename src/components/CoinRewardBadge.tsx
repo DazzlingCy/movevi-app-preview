@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import styles from './CoinRewardBadge.module.css';
+import { useEdgeDrag } from './useEdgeDrag';
 
 function LiveCoinDigits({ coins, from }: { coins: number; from?: number }) {
   const digits = String(coins);
@@ -25,6 +26,7 @@ export default function CoinRewardBadge({ coins, fraction, className = '', varia
 }) {
   const receipt = variant === 'receipt';
   const live = variant === 'live';
+  const { ref, position, dragging, ...dragHandlers } = useEdgeDrag(live);
   const previous = useRef(coins);
   const [change, setChange] = useState<{ from: number; to: number } | null>(null);
 
@@ -46,7 +48,11 @@ export default function CoinRewardBadge({ coins, fraction, className = '', varia
   const burst = receipt ? coins : increment ? coins - increment.from : 0;
 
   return (
-    <div className={`${styles.badge} ${receipt ? styles.receipt : className}`} data-variant={variant}>
+    <div ref={ref} className={`${styles.badge} ${receipt ? styles.receipt : className} ${live ? styles.draggable : ''}`}
+      data-variant={variant} data-dragging={dragging}
+      style={live && position ? { left: position.x, top: position.y, right: 'auto' } : undefined}
+      tabIndex={live ? 0 : undefined} aria-label={live ? '运动金币浮窗，可拖动贴边，方向键调整位置' : undefined}
+      {...(live ? dragHandlers : {})}>
       <div className={styles.ring} style={{ '--coin-reward-fill': `${fraction * 100}%` } as CSSProperties}
         role={receipt ? undefined : 'progressbar'} aria-label={receipt ? undefined : '运动金币进度'}
         aria-valuenow={receipt ? undefined : percent}
