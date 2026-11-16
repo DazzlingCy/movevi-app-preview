@@ -326,17 +326,18 @@ button.sceneryNotice {
   gap: 6px 12px;
 }
 .summaryMedals h3 { display: flex; align-items: center; gap: 5px; margin: 0; color: var(--run-accent); font-size: 12px; font-weight: 750; }
-.summaryMedals ul { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.summaryMedals ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .summaryMedals li {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
   border: 1px solid var(--run-line);
-  border-radius: 50%;
+  border-radius: 999px;
   background: #28333f;
-  font-size: 14px;
+  font-size: 11px;
 }
+.summaryMedals li svg { flex: none; color: #ffda88; }
 
 .summaryFooter { padding: 8px 18px; border-top: 1px solid var(--run-line); }
 .summaryButtons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

@@ -1,140 +1,89 @@
-import { getRouteCategory } from '../data/routeCategories';
 import { getJourneyCity, hasPublishedCityRoutes } from './data';
-import { getRouteStatus } from './state';
-import type { DailyRouteRecommendation } from './routeRecommendations';
-import type { JourneyState } from './types';
+import type { JourneyRoute } from './types';
 
-type RouteProfile = keyof typeof profiles;
-
-export interface RunScene {
-  label: string;
-  backdropHue: number;
-  profile: RouteProfile;
-  targetMinutes: number;
-  speedPlan: string;
-  music: string;
-  scenery: string;
+interface SceneCover {
+  image: string;
+  title: string;
 }
 
-const profiles = {
-  short: { distance: 3, landmarks: /公园|绿道|街区|步道/ },
-  easy: { distance: 4, nature: true },
-  steady: { distance: 5.5 },
-  steadyStreet: { distance: 5.5, landmarks: /大道|校园|大学|滨江|河岸|绿道/ },
-  longWater: { distance: 8, landmarks: /绿道|江|河|海|湾|湖|滨水|水岸/ },
-  water: { distance: 4, nature: true, landmarks: /江|河|海|湾|湖|滨水|水岸/ },
-  river: { distance: 5, landmarks: /江|河|滨水|水岸|运河|溪/ },
-  park: { distance: 4, nature: true, landmarks: /公园|花园|林|绿地|植物园/ },
-  lake: { distance: 5, nature: true, landmarks: /湖|池|水库/ },
-  trail: { distance: 5, nature: true, landmarks: /山|步道|林|森林/ },
-  coast: { distance: 5, nature: true, landmarks: /海|湾|滩|港/ },
-  track: { distance: 4, landmarks: /操场|体育|运动场|校园|大学/ },
-  street: { distance: 5, landmarks: /街|大道|巷|市集|广场/ },
-  landmark: { distance: 5, landmarks: /广场|地标|大道|塔|天际|大桥/ },
-  heritage: { distance: 4, landmarks: /古镇|老城|寺|宫|城墙|旧城|古城/ },
-} satisfies Record<string, { distance: number; nature?: boolean; landmarks?: RegExp }>;
+export interface SceneRoutePreview extends SceneCover {
+  preview: Pick<JourneyRoute, 'name' | 'distanceKm' | 'durationMinutes' | 'description' | 'landmarks'>;
+}
 
-type SceneEntry<Symbol extends string> = [
-  label: string, profile: RouteProfile, symbol: Symbol, targetMinutes: number, speedPlan: string, music: string, scenery: string, backdropHue: number,
-];
+export type SceneContent = SceneRoutePreview | (SceneCover & { cityId: string; routeLandmark: string; preview?: never });
 
-const group = <Id extends string, Symbol extends string>(id: Id, title: string, entries: SceneEntry<Symbol>[]) => ({
-  id, title, scenes: entries.map(([label, profile, symbol, targetMinutes, speedPlan, music, scenery, backdropHue]) => ({
-    label, profile, symbol, targetMinutes, speedPlan, music, scenery, backdropHue,
-  })),
-});
+export interface RunScene {
+  id: 'beach' | 'forest' | 'architecture' | 'midday';
+  group: 'natural' | 'lifestyle';
+  label: string;
+  backdropHue: number;
+  entries: readonly [SceneContent, ...SceneContent[]];
+}
 
 export const CITY_CARD_MODE_LABEL = '城市卡片';
 
-export const QUICK_RUN_SCENES = group('quick', '常用场景', [
-    ['轻松慢跑', 'easy', 'steps', 10, '慢速（4–6 km/h）', '原声吉他、轻器乐', '公园、绿道、湖岸', 165],
-    ['燃脂快跑', 'coast', 'flame', 15, '快速（6–8 km/h）', '动感电子、轻摇滚（选曲参考120–140 BPM）', '滨江、海岸、开阔城市景观', 15],
-]).scenes;
+export function runSceneImage(entry: SceneContent) {
+  return import.meta.env.BASE_URL + 'images/run-scenes/' + entry.image + '.webp';
+}
 
-export const RUN_SCENE_GROUPS = [
-  group('time', '时段场景', [
-    ['清晨轻松跑', 'park', 'morning', 10, '慢速（4–6 km/h）', '轻钢琴、清新原声', '明亮街区、公园晨景', 142],
-    ['日出追光跑', 'water', 'sunrise', 10, '慢速（4–6 km/h）', '明亮器乐、轻电子', '日出海岸、滨江或湖岸（AI制作）', 39],
-    ['晨间唤醒短跑', 'short', 'alarm', 10, '慢速（4–6 km/h）', '轻快原声、清新器乐', '晨光公园、街区短路线', 49],
-    ['午休抽空跑', 'short', 'sun', 10, '稳速（4–7 km/h）', '简洁节奏器乐', '景点集中的短街区、公园路线', 53],
-    ['黄昏落日慢跑', 'coast', 'sunset', 10, '慢速（4–6 km/h）', 'Chill、柔和电子', '落日海岸、黄昏滨江（AI制作）', 25],
-    ['放松夜跑', 'water', 'moon', 10, '慢速（4–6 km/h）', '夜间Lo-fi、柔和器乐', '城市灯光、夜间滨水路线（AI制作）', 226],
-    ['深夜安静慢跑', 'street', 'night', 10, '慢速（3–5 km/h）', '无音乐默认；可选氛围音乐', '曝光清晰、闪烁较少的深夜街区（AI制作）', 249],
-    ['早起活力跑', 'street', 'flame', 10, '中速（5–7 km/h）', '明亮流行器乐、轻电子', '晨间城市大道、滨水街区', 32],
-    ['周末晨间长跑', 'longWater', 'weekend', 20, '中速（5–7 km/h）', '旅行器乐、连续轻电子歌单', '较长的晨间河岸、绿道路线', 154],
-  ]),
-  group('outdoors', '户外环境', [
-    ['城市滨江跑', 'river', 'river', 15, '稳速（4–7 km/h）', '城市氛围、轻电子', '真实城市江岸、桥梁、滨水地标', 192],
-    ['公园林荫慢跑', 'park', 'trees', 10, '慢速（4–6 km/h）', '原声吉他、自然感器乐', '公园、树荫步道、绿道', 123],
-    ['环湖慢跑', 'lake', 'lake', 10, '慢速（4–6 km/h）', '柔和钢琴、舒缓器乐', '真实环湖路线；素材不足时改称湖畔慢跑', 184],
-    ['林间探索跑', 'trail', 'mountain', 10, '慢速（4–6 km/h）', '自然氛围、轻器乐', '稳定前进的林间路线，不模拟地形阻力', 112],
-    ['海边迎风慢跑', 'coast', 'wind', 15, '慢速（4–6 km/h）', 'Chill、轻吉他', '真实海岸栈道、海滨大道', 201],
-    ['校园操场圈跑', 'track', 'track', 10, '稳速（4–7 km/h）', '稳定节奏器乐', '实际拍摄的校园操场或跑道路线', 359],
-    ['城市街头跑', 'street', 'city', 10, '中速（5–7 km/h）', '轻电子、都市流行器乐', '城市街道、广场、特色街区', 268],
-    ['城市观景慢跑', 'landmark', 'city', 10, '慢速（4–6 km/h）', '轻钢琴、柔和原声', '城市地标、广场、开阔街道', 208],
-    ['人文街区慢跑', 'heritage', 'heritage', 10, '慢速（4–6 km/h）', '轻吉他、轻快器乐', '特色街巷、历史建筑、生活街景', 42],
-    ['江边晚风慢跑', 'river', 'wind', 15, '慢速（4–6 km/h）', 'Lo-fi、Chill', '傍晚江岸、晚霞滨水路线（AI制作）', 206],
-    ['山间步道慢跑', 'trail', 'trail', 10, '慢速（4–6 km/h）', '自然氛围、无歌词器乐', '稳定的山间步道实景，不承诺坡度同步', 135],
-    ['古镇漫游跑', 'heritage', 'heritage', 10, '慢速（3–5 km/h）', '轻器乐、适合当地氛围的音乐', '古镇街巷、石桥、历史建筑', 34],
-  ]),
-  group('indoors', '室内场景', [
-    ['居家跑步机', 'easy', 'home', 10, '用户自定义（参考4–6 km/h）', '用户常听歌单；默认轻器乐', '当前城市、公园、滨水均可选择', 274],
-    ['健身房间歇跑', 'steadyStreet', 'interval', 15, '快慢交替（慢速、快速档由用户设置）', '按阶段匹配稳定/活力音乐', '连续、画面稳定的城市大道或绿道', 304],
-    ['雨天跑步机', 'park', 'rain', 10, '慢速（4–6 km/h）', '明亮轻快器乐', '默认晴天城市、公园；不要求视频也下雨', 217],
-    ['居家短时跑', 'short', 'steps', 10, '慢速（3–5 km/h）', '轻快原声、简洁器乐', '短公园路线、清晰明亮的街区', 47],
-    ['健身房稳速跑', 'steadyStreet', 'pulse', 15, '中速（5–7 km/h）', '稳定节奏电子、流行器乐', '都市大道、连续河岸路线', 285],
-    ['冬季室内长跑', 'longWater', 'snow', 20, '中速（5–7 km/h）', '连续旅行器乐、轻电子歌单', '较长的城市、海岸、绿道素材；不必是雪景', 211],
-  ]),
-  group('training', '配速与训练', [
-    ['城市变速跑', 'steadyStreet', 'speed', 15, '快慢交替（慢速、快速档由用户设置）', '按阶段匹配节奏音乐', '连续城市路线，需具备变速标定', 4],
-    ['耐力长跑', 'longWater', 'distance', 20, '中速（5–7 km/h）', '稳定节奏、少突变长歌单', '较长的绿道、河岸或海岸连续路线', 176],
-    ['稳速节奏跑', 'steadyStreet', 'pace', 15, '稳速（5–8 km/h）', '节奏稳定的电子、流行器乐', '都市大道、滨水、校园路线', 232],
-    ['舒缓走跑', 'park', 'pulse', 10, '慢速（3–5 km/h）', '舒缓器乐；可无音乐', '平稳的公园、湖岸实景', 153],
-    ['轻松起步跑', 'short', 'steps', 5, '慢速（3–5 km/h）', '柔和轻快器乐', '明亮短街区、公园步道', 56],
-    ['舒缓收尾跑', 'park', 'wind', 5, '慢速（3–5 km/h）', '柔和钢琴、安静氛围音乐', '平静湖岸、公园、黄昏步道', 292],
-    ['城市地标打卡跑', 'landmark', 'target', 20, '中速（5–7 km/h）', '稳定节奏、活力器乐', '城市地标、广场、特色建筑串联路线', 19],
-    ['滨水巡游跑', 'longWater', 'river', 20, '中速（5–8 km/h）', '长时稳定节奏歌单', '画面稳定、节奏连贯的江岸或湖畔步道', 190],
-    ['长距离探索跑', 'longWater', 'distance', 20, '中速（5–7 km/h）', '长时旅行器乐、轻电子', '可持续播放的长城市或滨水路线', 172],
-  ]),
-  group('mood', '情绪与心态', [
-    ['放空漫游跑', 'water', 'clear', 10, '慢速（3–5 km/h）', '氛围音乐、柔和器乐', '开阔海岸、安静湖岸、公园', 182],
-    ['开心畅快嗨跑', 'landmark', 'smile', 15, '快速（6–8 km/h）', '明亮电子、流行器乐', '繁华街区、都市地标、明亮滨水', 319],
-    ['轻松充电跑', 'park', 'battery', 10, '慢速（3–5 km/h）', '柔和原声、轻器乐', '较短的绿道、公园路线', 91],
-    ['独处静心慢跑', 'lake', 'leaf', 10, '慢速（3–5 km/h）', '无歌词氛围音乐；可关闭', '安静林荫步道、湖岸', 149],
-    ['活力解压跑', 'river', 'flame', 15, '中速（5–7 km/h）', '节奏鲜明的电子、轻摇滚器乐', '都市大道、滨江、开阔街区', 9],
-    ['甩掉坏心情', 'coast', 'clear', 10, '慢速（4–6 km/h）', '轻快流行器乐、Chill', '明亮海岸、公园、开阔城市景观', 198],
-    ['随心漫游慢跑', 'park', 'trail', 10, '慢速（3–5 km/h）', '无音乐默认；可选柔和器乐', '安静街区、林荫、湖岸', 128],
-  ]),
-  group('company', '音乐与玩法', [
-    ['独自耳机跑', 'steady', 'audio', 10, '用户自定义（参考4–7 km/h）', '用户自选歌单；默认轻电子', '城市、绿道、滨水任选', 262],
-    ['同景同行跑', 'steady', 'friends', 10, '用户自定义（参考4–6 km/h）', '各自选择；默认轻快器乐', '两人自行选择同一条已开放路线', 317],
-    ['公园趣味跑', 'park', 'leaf', 10, '慢速（3–5 km/h）', '轻快原声、趣味器乐', '公园、花园、生活街景；不承诺宠物互动', 79],
-    ['听播客慢跑', 'water', 'podcast', 10, '慢速（4–6 km/h）', '播客人声；背景音乐默认关闭', '平稳绿道、河岸等低干扰实景', 220],
-  ]),
+export const RUN_SCENES: readonly RunScene[] = [
+  {
+    id: 'beach',
+    group: 'natural',
+    label: '海滩',
+    backdropHue: 196,
+    entries: [
+      { image: 'beach-sydney', title: '悉尼', cityId: 'sydney', routeLandmark: '悉尼歌剧院' },
+      { image: 'beach-miami', title: '迈阿密', preview: { name: '迈阿密海滨 · 棕榈长廊', distanceKm: 4.1, durationMinutes: 30, landmarks: ['南海滩', '海滨步道', '棕榈长廊'], description: '沿海滨长廊慢跑，在棕榈树和开阔的海面之间找回自己的节奏。' } },
+      { image: 'beach-bali', title: '巴厘岛', preview: { name: '巴厘岛海岸 · 海风慢跑', distanceKm: 3.4, durationMinutes: 25, landmarks: ['海滩入口', '海岸步道', '临海观景点'], description: '沿着海岸轻松起步，边跑边看看浪花和海边的风景。' } },
+    ],
+  },
+  {
+    id: 'forest',
+    group: 'natural',
+    label: '森林',
+    backdropHue: 142,
+    entries: [
+      { image: 'forest-auckland', title: '奥克兰', preview: { name: '奥克兰林径 · 绿荫漫跑', distanceKm: 3.6, durationMinutes: 28, landmarks: ['林径入口', '林荫步道', '树冠观景段'], description: '从林荫步道出发，沿途看看树冠间洒下的光，保持轻松的步频。' } },
+      { image: 'forest-podgorica', title: '波德戈里察', preview: { name: '波德戈里察 · 林间漫跑', distanceKm: 4, durationMinutes: 31, landmarks: ['林道入口', '林荫缓坡', '森林转弯处'], description: '跟着林间小路一路向前，穿过连片树荫，享受一段安静的慢跑。' } },
+      { image: 'forest-philadelphia', title: '费城', preview: { name: '费城绿道 · 林荫巡游', distanceKm: 3.8, durationMinutes: 29, landmarks: ['城市绿道入口', '林荫直道', '绿道休憩点'], description: '在绿道上匀速向前，沿着树木成排的路段感受从城市到林间的变化。' } },
+    ],
+  },
+  {
+    id: 'architecture',
+    group: 'natural',
+    label: '建筑',
+    backdropHue: 29,
+    entries: [
+      { image: 'architecture-giza', title: '胡夫金字塔', cityId: 'cairo', routeLandmark: '吉萨金字塔' },
+      { image: 'architecture-abu-dhabi', title: '阿布扎比王宫', preview: { name: '阿布扎比王宫 · 宫苑漫跑', distanceKm: 3.2, durationMinutes: 24, landmarks: ['王宫外广场', '宫苑拱廊', '外侧林荫道'], description: '从王宫外的开阔空间出发，沿途欣赏建筑立面和拱廊细节。' } },
+      { image: 'architecture-paris', title: '巴黎圣母院', cityId: 'paris', routeLandmark: '巴黎圣母院' },
+    ],
+  },
+  {
+    id: 'midday',
+    group: 'lifestyle',
+    label: '午间休息',
+    backdropHue: 265,
+    entries: [
+      { image: 'break-florence', title: '佛罗伦萨', preview: { name: '佛罗伦萨古城 · 午间漫步', distanceKm: 2.6, durationMinutes: 20, landmarks: ['古城巷口', '街心小广场', '古城观景街段'], description: '趁午间走一小段，看看古城街景和沿途的屋顶与建筑。' } },
+      { image: 'break-buenos-aires', title: '布宜诺斯艾利斯', preview: { name: '布宜诺斯艾利斯 · 街景漫步', distanceKm: 2.8, durationMinutes: 22, landmarks: ['街区入口', '彩色建筑街段', '街角广场'], description: '用舒缓的步频逛一段城市街景，给午间留一点活动时间。' } },
+      { image: 'break-singapore', title: '新加坡', cityId: 'singapore', routeLandmark: '金沙天际' },
+      { image: 'break-kyoto', title: '京都', preview: { name: '京都街巷 · 午间慢行', distanceKm: 2.5, durationMinutes: 20, landmarks: ['古街入口', '石板小巷', '街巷转角'], description: '沿着京都街巷轻松走一段，留意街边屋檐和转角的风景。' } },
+    ],
+  },
 ];
 
-export function getSceneRoutes(scene: RunScene, state: JourneyState): DailyRouteRecommendation[] {
-  const profile: { distance: number; nature?: boolean; landmarks?: RegExp } = profiles[scene.profile];
-  const cities = [...new Set([state.currentCityId, ...state.completedCityIds])];
-  const ranked = cities.filter(hasPublishedCityRoutes).flatMap(cityId => {
-    const city = getJourneyCity(cityId);
-    if (!city) return [];
-    return city.routes.filter(route => getRouteStatus(state, cityId, route.id) !== 'locked').map(route => {
-      let score = -Math.abs(route.distanceKm - profile.distance);
-      score -= Math.abs(route.durationMinutes - scene.targetMinutes) / 12;
-      if (profile.nature && getRouteCategory(city.name, route.order) === '自然类') score += 1;
-      if (profile.landmarks?.test(`${route.name} ${route.landmarks.join(' ')}`)) score += 6;
-      if (cityId === state.currentCityId) score += .4;
-      return { city, route, score };
-    });
-  }).sort((a, b) => b.score - a.score);
-  const seen = new Set<string>();
-  const picks: DailyRouteRecommendation[] = [];
-  for (const { city, route } of ranked) {
-    if (seen.has(city.id)) continue;
-    seen.add(city.id);
-    picks.push({ city, route });
-    if (picks.length === 5) break;
+export function getSceneContentRoute(entry: SceneContent): JourneyRoute | undefined {
+  if (!('cityId' in entry)) {
+    return {
+      ...entry.preview,
+      id: entry.image,
+      cityId: `scene-${entry.image}`,
+      order: 1,
+      calories: Math.round(entry.preview.distanceKm * 65),
+    };
   }
-  return picks;
+  if (!hasPublishedCityRoutes(entry.cityId)) return;
+  return getJourneyCity(entry.cityId)?.routes.find(route => route.landmarks[0] === entry.routeLandmark);
 }

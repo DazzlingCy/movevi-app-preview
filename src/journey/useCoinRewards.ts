@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { exerciseDay } from './dailyExercise';
-import { COINS_PER_YUAN, coinBalance, coinDayProgress, coinWorkoutProgress, readCoinLedger, recordCoinWithdrawal, recordStarterClaim, settleCoinWorkout, type CoinLedger, type CoinTrack, type CoinWorkout } from './coinRewards';
+import { cashBalance, coinBalance, coinDayProgress, coinWorkoutProgress, getAvailableMedals, getExchangedMedals, getMedalDraws, readCoinLedger, recordCashExchange, recordCashWithdrawal, recordMedalDraw, recordMedalExchange, recordStarterClaim, settleCoinWorkout, type CoinLedger, type CoinTrack, type CoinWorkout } from './coinRewards';
+import { MEDAL_LOTTERY_DRAW_COST, MEDAL_LOTTERY_POOL_SIZE, PREVIEW_AVAILABLE_MEDALS, PREVIEW_EXCHANGED_MEDALS } from './medalLottery';
 
 declare const __APP_VERSION__: string;
+
+function createPreviewLedger(): CoinLedger {
+  const exchange = recordMedalExchange([], PREVIEW_EXCHANGED_MEDALS, Date.now());
+  return exchange ? [exchange] : [];
+}
 
 export function useCoinRewards(demo: boolean) {
   // Vite preview serves a production build, including over the local network.
@@ -11,10 +17,12 @@ export function useCoinRewards(demo: boolean) {
     && window.location.pathname.startsWith('/movevi-app-preview');
   const transientPreview = localPreview || hostedPreview;
   const trackWorkouts = transientPreview || demo;
+  const canSimulateWithdrawal = transientPreview || demo;
+  const previewMedals = transientPreview ? PREVIEW_AVAILABLE_MEDALS : [];
   const key = demo ? 'movevi-coins-demo-v1' : 'movevi-coins-v1';
   const read = () => readCoinLedger(localStorage.getItem(key));
   const [ledger, setLedger] = useState<CoinLedger>(() => {
-    if (transientPreview) return [];
+    if (transientPreview) return createPreviewLedger();
     try { return read(); } catch { return []; }
   });
   const latest = useRef(ledger);
@@ -54,6 +62,8 @@ export function useCoinRewards(demo: boolean) {
     setNow(Date.now());
     return true;
   };
+  const withLedgerLock = <T,>(mutate: () => T) => !transientPreview && navigator.locks
+    ? navigator.locks.request(key, mutate) : mutate();
 
   const day = exerciseDay(now);
   const starterClaims = new Set(ledger.flatMap(entry =>
@@ -66,11 +76,52 @@ export function useCoinRewards(demo: boolean) {
     trackWorkouts,
     ledger,
     balance: coinBalance(ledger),
+    cashCents: cashBalance(ledger),
+    canSimulateWithdrawal,
     today: coinDayProgress(ledger, now),
     starterClaims,
+    availableMedals: getAvailableMedals(ledger, previewMedals),
+    exchangedMedals: getExchangedMedals(ledger).reverse(),
+    medalDraws: getMedalDraws(ledger),
+    async exchangeMedals(ids: readonly string[]) {
+      const exchange = () => {
+        const selected = new Set(ids);
+        let earned = 0;
+        const saved = update(previous => {
+          const medals = getAvailableMedals(previous, previewMedals).filter(medal => selected.has(medal.id));
+          const entry = recordMedalExchange(previous, medals, Date.now());
+          if (!entry) return previous;
+          earned = entry.coins;
+          return [...previous, entry];
+        });
+        return saved ? earned : 0;
+      };
+      return withLedgerLock(exchange);
+    },
+    async drawMedalLottery() {
+      const draw = () => {
+        let outcome: { prizeIndex: number } | { message: string } = { message: '抽奖记录保存失败，请重试' };
+        const saved = update(previous => {
+          if (getMedalDraws(previous).length >= MEDAL_LOTTERY_POOL_SIZE) {
+            outcome = { message: '本期红包已抽完' };
+            return previous;
+          }
+          if (coinBalance(previous) < MEDAL_LOTTERY_DRAW_COST) {
+            outcome = { message: '金币不足，可先兑换景点勋章' };
+            return previous;
+          }
+          const id = 'medal-draw-' + crypto.getRandomValues(new Uint32Array(4)).join('-');
+          const entry = recordMedalDraw(previous, id, Date.now());
+          if (!entry) return previous;
+          outcome = { prizeIndex: entry.prizeIndex };
+          return [...previous, entry];
+        });
+        return !saved && 'prizeIndex' in outcome ? { message: '抽奖记录保存失败，请重试' } : outcome;
+      };
+      return withLedgerLock(draw);
+    },
     async claimStarter(track: CoinTrack) {
-      const claim = () => update(previous => recordStarterClaim(previous, track, Date.now()));
-      return !transientPreview && navigator.locks ? navigator.locks.request(key, claim) : claim();
+      return withLedgerLock(() => update(previous => recordStarterClaim(previous, track, Date.now())));
     },
     preview: (workout: CoinWorkout) => trackWorkouts ? settleCoinWorkout(ledger, workout)?.reward : undefined,
     progress: (workout: CoinWorkout) => trackWorkouts ? coinWorkoutProgress(ledger, workout) : undefined,
@@ -84,13 +135,15 @@ export function useCoinRewards(demo: boolean) {
       });
       return saved ? entry ?? undefined : undefined;
     },
-    loadDemoBalance() {
-      return demo && update(previous => previous.some(entry => entry.id === 'demo-credit') ? previous : [
-        ...previous, { kind: 'demo-credit', id: 'demo-credit', at: Date.now(), coins: COINS_PER_YUAN },
-      ]);
+    async exchangeCash(coins: number, id: string) {
+      return withLedgerLock(() => update(previous => recordCashExchange(previous, coins, id, Date.now())));
     },
-    withdraw(amount: string | number, id: string) {
-      return demo && update(previous => recordCoinWithdrawal(previous, amount, id, Date.now()));
+    async loadDemoBalance() {
+      return demo && withLedgerLock(() => update(previous => previous.some(entry => entry.kind === 'demo-credit' || entry.kind === 'demo-cash-credit')
+        ? previous : [...previous, { kind: 'demo-cash-credit', id: 'demo-cash-credit', at: Date.now(), cents: 100 }]));
+    },
+    async withdraw(amount: string | number, id: string) {
+      return canSimulateWithdrawal && withLedgerLock(() => update(previous => recordCashWithdrawal(previous, amount, id, Date.now())));
     },
   };
 }

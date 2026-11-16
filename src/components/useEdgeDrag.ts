@@ -102,4 +102,3 @@ export function useEdgeDrag(enabled: boolean) {
 
   return { ref, position, dragging, onPointerDown, onPointerMove, onPointerUp: finish, onPointerCancel: finish, onLostPointerCapture: finish, onKeyDown };
 }
-

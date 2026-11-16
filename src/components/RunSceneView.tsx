@@ -1,33 +1,22 @@
 import { useLayoutEffect, useRef } from 'react';
-import {
-  Activity, AlarmClock, BatteryCharging, Building2, CalendarDays, Check,
-  CircleDashed, Clock3, CloudRain, CloudSun, Coffee, Droplets, Flame, Footprints, Gauge, Headphones,
-  GalleryHorizontalEnd, HeartPulse, House, Landmark, Leaf, Moon, MoonStar, Mountain, MountainSnow,
-  Podcast, Route, Signpost, Smile, Snowflake, Sun, Sunrise, Sunset, Target, TimerReset,
-  UsersRound, Waves, Wind, Zap, Trees, type LucideIcon,
-} from 'lucide-react';
-import { CITY_CARD_MODE_LABEL, QUICK_RUN_SCENES, RUN_SCENE_GROUPS, type RunScene } from '../journey/runScenes';
+import { Check, Clock3, Coffee, GalleryHorizontalEnd, Landmark, Route, Trees, Waves } from 'lucide-react';
+import { CITY_CARD_MODE_LABEL, RUN_SCENES, runSceneImage, type RunScene } from '../journey/runScenes';
 import styles from './RunSceneView.module.css';
 
-const groupIcons = { time: Clock3, outdoors: Mountain, indoors: House, training: Activity, mood: Smile, company: UsersRound };
-
-const sceneIcons = {
-  morning: Coffee, sunrise: Sunrise, alarm: AlarmClock, sun: Sun, sunset: Sunset, moon: Moon, night: MoonStar,
-  flame: Flame, weekend: CalendarDays, river: Waves, trees: Trees, lake: Droplets,
-  mountain: MountainSnow, wind: Wind, track: CircleDashed, city: Building2, rain: CloudRain, leaf: Leaf,
-  trail: Signpost, heritage: Landmark, home: House, interval: TimerReset, steps: Footprints, pulse: HeartPulse,
-  snow: Snowflake, speed: Zap, distance: Route, pace: Gauge, target: Target,
-  clear: CloudSun, smile: Smile, battery: BatteryCharging,
-  audio: Headphones, friends: UsersRound, podcast: Podcast,
-} satisfies Record<(typeof RUN_SCENE_GROUPS)[number]['scenes'][number]['symbol'] | (typeof QUICK_RUN_SCENES)[number]['symbol'], LucideIcon>;
+const sceneIcons = { beach: Waves, forest: Trees, architecture: Landmark, midday: Coffee };
+const sceneGroups = [
+  { id: 'natural', label: '自然环境', upcoming: { label: '公路', image: 'recommendations/feature/2c44b59aba219bafb683.webp', icon: Route } },
+  { id: 'lifestyle', label: '生活场景', upcoming: { label: '碎片时间', image: 'run-scenes/break-singapore.webp', icon: Clock3 } },
+] as const;
 
 interface Props {
   selection: RunScene | null;
   onSelect: (scene: RunScene | null) => void;
+  onUnavailable: () => void;
   onClose: () => void;
 }
 
-export default function RunSceneView({ selection, onSelect, onClose }: Props) {
+export default function RunSceneView({ selection, onSelect, onUnavailable, onClose }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const swipe = useRef<{ id: number; x: number; y: number } | null>(null);
   const swipeDismissed = useRef(false);
@@ -61,45 +50,33 @@ export default function RunSceneView({ selection, onSelect, onClose }: Props) {
           <p>今天想怎么跑？</p>
         </header>
         <div className={styles.scroll}>
-          <section className={styles.quickSection} aria-labelledby="run-scene-quick">
-            <h2 id="run-scene-quick">常用场景</h2>
-            <div className={styles.quick}>
+          <div className={styles.quick}>
               <button className={styles.cityMode} type="button" aria-pressed={selection === null} aria-description="按城市浏览跑步路线" onClick={() => onSelect(null)}>
                 <GalleryHorizontalEnd size={20} strokeWidth={2} aria-hidden="true" />
                 <span>{CITY_CARD_MODE_LABEL}</span>
                 {selection === null && <Check className={styles.quickCheck} size={16} aria-hidden="true" />}
               </button>
-              {QUICK_RUN_SCENES.map(scene => {
-                const Icon = sceneIcons[scene.symbol];
-                const active = selection === scene;
-                return <button key={scene.label} type="button" aria-pressed={active} aria-description={`目标 ${scene.targetMinutes} 分钟，${scene.speedPlan}`} onClick={() => onSelect(scene)}>
-                  <Icon size={19} strokeWidth={2} aria-hidden="true" />
-                  <span>{scene.label}</span>
-                  {active && <Check className={styles.quickCheck} size={16} aria-hidden="true" />}
-                </button>;
-              })}
-            </div>
-          </section>
-          <div className={styles.catalog}>
-            {RUN_SCENE_GROUPS.map(group => {
-              const GroupIcon = groupIcons[group.id];
-              return <section key={group.id} className={styles.group} aria-labelledby={`run-scene-${group.id}`}>
-                <div className={styles.groupHeading}>
-                  <GroupIcon size={14} strokeWidth={1.8} aria-hidden="true" />
-                  <h2 id={`run-scene-${group.id}`}>{group.title}</h2>
-                </div>
-                <div className={styles.tags}>
-                  {group.scenes.map(scene => {
-                    const Icon = sceneIcons[scene.symbol];
-                    return <button key={scene.label} type="button" aria-pressed={selection === scene} onClick={() => onSelect(scene)}>
-                      <Icon size={22} strokeWidth={1.9} aria-hidden="true" />
-                      <span>{scene.label}</span>
-                    </button>;
-                  })}
-                </div>
-              </section>;
-            })}
           </div>
+          {sceneGroups.map(group => (
+            <section className={styles.catalog} key={group.id} aria-labelledby={`run-scene-${group.id}`}>
+              <h2 id={`run-scene-${group.id}`}>{group.label}</h2>
+              <div className={styles.tags}>
+                {RUN_SCENES.filter(scene => scene.group === group.id).map(scene => {
+                  const Icon = sceneIcons[scene.id];
+                  const active = selection?.id === scene.id;
+                  return <button key={scene.id} type="button" aria-pressed={active} onClick={() => onSelect(scene)}>
+                    <img src={runSceneImage(scene.entries[0])} alt="" decoding="async" />
+                    <span className={styles.tagLabel}><Icon size={17} aria-hidden="true" />{scene.label}</span>
+                    {active && <Check className={styles.tagCheck} size={14} aria-hidden="true" />}
+                  </button>;
+                })}
+                <button className={styles.upcoming} type="button" onClick={onUnavailable}>
+                  <img src={`${import.meta.env.BASE_URL}images/${group.upcoming.image}`} alt="" decoding="async" />
+                  <span className={styles.tagLabel}><group.upcoming.icon size={17} aria-hidden="true" />{group.upcoming.label}</span>
+                </button>
+              </div>
+            </section>
+          ))}
         </div>
       </div>
       <button className={styles.dismissArea} type="button" onClick={onClose} aria-label="收起跑步模式" />

@@ -1,23 +1,21 @@
-import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { getRouteCategory } from '../data/routeCategories';
 import { getRouteCover } from '../data/routeCovers';
 import type { DailyRouteRecommendation } from '../journey/routeRecommendations';
-import type { RunScene } from '../journey/runScenes';
 import type { JourneyCity, JourneyRoute } from '../journey/types';
 import { resolveRecommendationCover } from '../lib/localImages';
 import CityImage from './CityImage';
-import RouteCardRail from './RouteCardRail';
 import StickyHeroNav, { HeroBackButton } from './StickyHeroNav';
 import styles from './DailyRouteRecommendationsView.module.css';
 
-type Props = {
+interface Props {
   cityImageFor: (city: JourneyCity) => string;
+  day: string;
   recommendations: DailyRouteRecommendation[];
+  scrollTop: number;
+  onBack: () => void;
   onRouteClick: (route: JourneyRoute, position: number) => void;
-} & (
-  | { day: string; onBack: () => void; scrollTop: number; scene?: never; homeControls?: never; routeIndex?: never; onRouteIndexChange?: never; onOpenRunScenes?: never }
-  | { scene: RunScene; homeControls: ReactNode; routeIndex: number; onRouteIndexChange: (index: number) => void; onOpenRunScenes: () => void; day?: never; onBack?: never; scrollTop?: never }
-);
+}
 
 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'UTC',
@@ -26,71 +24,50 @@ const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
   weekday: 'long',
 });
 
-export default function DailyRouteRecommendationsView({ cityImageFor, day, scene, homeControls, recommendations, routeIndex, onRouteIndexChange, onOpenRunScenes, scrollTop, onBack, onRouteClick }: Props) {
+export default function DailyRouteRecommendationsView({ cityImageFor, day, recommendations, scrollTop, onBack, onRouteClick }: Props) {
   const pageRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
-    if (pageRef.current) pageRef.current.scrollTop = scrollTop ?? 0;
-  }, [scene, scrollTop]);
-
-  const isScene = scene !== undefined;
-  const backdropStyle = scene && { '--scene-background-hue': scene.backdropHue } as CSSProperties;
-  const priorityIndex = routeIndex ?? 0;
-  const cards = recommendations.map(({ city, route }, index) => {
-    const featured = isScene || index === 0;
-    const category = getRouteCategory(city.name, route.order);
-    const cover = getRouteCover(city.name, route.order)?.src;
-    return (
-      <button type="button" className={`${styles.route}${featured ? ` ${styles.featured}` : ''}`} onClick={() => onRouteClick(route, isScene ? index : (pageRef.current?.scrollTop ?? 0))}>
-        <span className={styles.cover}>
-          <CityImage
-            className={styles.image}
-            src={cover ?? cityImageFor(city)}
-            optimizedSrc={resolveRecommendationCover(cover, featured ? 'feature' : 'thumbnail')}
-            alt=""
-            fallbackLabel={route.landmarks[0]}
-            loading={(isScene ? Math.abs(index - priorityIndex) <= 1 : index < 3) ? 'eager' : 'lazy'}
-            fetchPriority={index === priorityIndex ? 'high' : 'low'}
-          />
-        </span>
-        {isScene ? (
-          <span className={`${styles.routeType} ${styles.sceneType}`}>{category}</span>
-        ) : index === 0 && <span className={styles.kicker}>今日精选</span>}
-        <span className={styles.routeBody}>
-          <span className={styles.routeMeta}>
-            {city.name}
-            {!isScene && <span className={styles.routeType}>{category}</span>}
-          </span>
-          <strong>{isScene ? route.name.replace('·', '') : route.name}</strong>
-          {featured && <span className={styles.landmarks}>{route.landmarks.join(' · ')}</span>}
-        </span>
-        <span className={styles.metrics}>{route.distanceKm.toFixed(1)} km · 约 {route.durationMinutes} 分钟</span>
-        <span className={styles.action}>{featured ? '查看路线' : '查看'}</span>
-      </button>
-    );
-  });
+    if (pageRef.current) pageRef.current.scrollTop = scrollTop;
+  }, [scrollTop]);
 
   return (
-    <main ref={pageRef} className={isScene ? `${styles.page} ${styles.sceneHome}` : styles.page} style={backdropStyle} id="main-content">
-      {scene ? <header className={styles.homeBar}>{homeControls}</header> : (
-        <StickyHeroNav overlapHero={false}>
-          <HeroBackButton label="返回首页" onClick={onBack} />
-        </StickyHeroNav>
-      )}
+    <main ref={pageRef} className={styles.page} id="main-content">
+      <StickyHeroNav overlapHero={false}>
+        <HeroBackButton label="返回首页" onClick={onBack} />
+      </StickyHeroNav>
       <div className={styles.content}>
         <header className={styles.listHeader}>
-          <h1>{scene?.label ?? '每日推荐'}</h1>
-          {day && <time dateTime={day}>{dateFormatter.format(new Date(day))}</time>}
+          <h1>每日推荐</h1>
+          <time dateTime={day}>{dateFormatter.format(new Date(day))}</time>
         </header>
-        {scene && (
-          <p className={styles.scenePlan}>目标 {scene.targetMinutes} 分钟 <span aria-hidden="true">·</span> {scene.speedPlan}</p>
-        )}
-        {!cards.length ? <p className={styles.empty}>{isScene ? '暂无可跑路线' : '今日暂无推荐路线'}</p> : scene ? (
-          <div key={`routes-${scene.label}`} className={styles.sceneRail} aria-label="场景推荐路线">
-            <RouteCardRail items={cards} initialIndex={routeIndex} onSelect={onRouteIndexChange} onSwipePastStart={onOpenRunScenes} />
-          </div>
-        ) : (
+        {!recommendations.length ? <p className={styles.empty}>今日暂无推荐路线</p> : (
           <ul className={styles.routes} aria-label="每日推荐路线">
-            {cards.map((card, index) => <li key={recommendations[index].route.id}>{card}</li>)}
+            {recommendations.map(({ city, route }, index) => {
+              const featured = index === 0;
+              const category = getRouteCategory(city.name, route.order);
+              const cover = getRouteCover(city.name, route.order)?.src;
+              return (
+                <li key={route.id}>
+                  <button type="button" className={styles.route + (featured ? ' ' + styles.featured : '')}
+                    onClick={() => onRouteClick(route, pageRef.current?.scrollTop ?? 0)}>
+                    <span className={styles.cover}>
+                      <CityImage className={styles.image} src={cover ?? cityImageFor(city)}
+                        optimizedSrc={resolveRecommendationCover(cover, featured ? 'feature' : 'thumbnail')}
+                        alt="" fallbackLabel={route.landmarks[0]} loading={index < 3 ? 'eager' : 'lazy'}
+                        fetchPriority={featured ? 'high' : 'low'} />
+                    </span>
+                    {featured && <span className={styles.kicker}>今日精选</span>}
+                    <span className={styles.routeBody}>
+                      <span className={styles.routeMeta}>{city.name}<span className={styles.routeType}>{category}</span></span>
+                      <strong>{route.name}</strong>
+                      {featured && <span className={styles.landmarks}>{route.landmarks.join(' · ')}</span>}
+                    </span>
+                    <span className={styles.metrics}>{route.distanceKm.toFixed(1)} km · 约 {route.durationMinutes} 分钟</span>
+                    <span className={styles.action}>{featured ? '查看路线' : '查看'}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

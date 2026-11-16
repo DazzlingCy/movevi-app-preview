@@ -4,6 +4,8 @@ import { ArrowRight, Award, ChevronLeft, Coins, MapPin, Pause, Play, Volume2, Vo
 import { CITIES, getRouteData } from '../data/cities';
 import { reloadRunSceneryVideo } from '../lib/runScenery';
 import { coinMileageCounter, isCoinRouteComplete, type CoinExerciseEvidence, type CoinReward } from '../journey/coinRewards';
+import { getJourneyCity } from '../journey/data';
+import { getMedalLandmarks } from '../journey/medalLottery';
 import CityImage from './CityImage';
 import CoinRewardBadge from './CoinRewardBadge';
 import type { CityRouteListItem } from './CityRoutesView';
@@ -12,24 +14,16 @@ import styles from './RunPlaybackView.module.css';
 
 const sceneryLoadTimeoutMs = 8000;
 
-const MEDALS = [
-  { id: 'm1', name: '首航·星际启程', text: '🏯' },
-  { id: 'm2', name: '江潮·古道点亮', text: '⛩️' },
-  { id: 'm3', name: '中轴·紫禁之巅', text: '🏰' },
-  { id: 'm4', name: '星火·光能复苏', text: '🗼' },
-  { id: 'm5', name: '超越·时空引力', text: '🛸' },
-  { id: 'm6', name: '不朽·地球倒影', text: '🌍' },
-];
-
 interface RunPlaybackViewProps {
   cityId: string;
   routeIndex: number;
   image: string;
   cityName?: string;
   routeOverride?: CityRouteListItem;
-  prepareScenery: () => HTMLVideoElement;
+  prepareScenery?: () => HTMLVideoElement;
   onExit: () => void;
   requireFullRoute?: boolean;
+  useActualStats?: boolean;
   demoCompleteSignal?: number;
   coinRewards?: {
     demo: boolean;
@@ -51,7 +45,7 @@ const parsePlannedDuration = (value: string) => {
   return minutes * 60 + seconds;
 };
 
-export default function RunPlaybackView({ cityId, routeIndex, image, cityName: cityNameOverride, routeOverride, prepareScenery, onExit, onComplete, requireFullRoute = false, demoCompleteSignal = 0, coinRewards }: RunPlaybackViewProps) {
+export default function RunPlaybackView({ cityId, routeIndex, image, cityName: cityNameOverride, routeOverride, prepareScenery, onExit, onComplete, requireFullRoute = false, useActualStats = false, demoCompleteSignal = 0, coinRewards }: RunPlaybackViewProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [distance, setDistance] = useState(0);
   const [time, setTime] = useState(0);
@@ -69,12 +63,16 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
 
   const city = CITIES.find(item => String(item.id) === String(cityId));
   const route = routeOverride ?? getRouteData(cityId, routeIndex);
+  const journeyRoute = getJourneyCity(cityId)?.routes.find(item => item.order === routeIndex);
+  const medalNames = journeyRoute ? getMedalLandmarks(journeyRoute) : [];
   const cityName = cityNameOverride ?? city?.name ?? '城市';
   const plannedDistance = Number(route.distance) || 0;
   const plannedDuration = parsePlannedDuration(route.duration);
   const routeFinished = !requireFullRoute || distance >= plannedDistance;
   const manuallySimulated = !!coinEvidence && coinEvidence.source !== 'playback';
   const simulatedPartial = manuallySimulated && !isCoinRouteComplete({ ...coinEvidence, plannedMeters: Math.round(plannedDistance * 1000) });
+  const earnsMedals = routeFinished && !!coinEvidence && !!coinRewards?.tracking
+    && isCoinRouteComplete({ ...coinEvidence, plannedMeters: Math.round(plannedDistance * 1000) });
   const reward = showSummary && coinEvidence ? coinRewards?.preview(coinEvidence) : undefined;
   const liveEvidence: CoinExerciseEvidence = {
     meters: Math.round(distance * 1000), activeSeconds: time, endedAt: Date.now(), source: 'playback',
@@ -97,7 +95,7 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
 
   useLayoutEffect(() => {
     const host = sceneryHostRef.current;
-    if (!host) return;
+    if (!host || !prepareScenery) return;
     const video = prepareScenery();
     const showScenery = () => {
       setSceneryVisible(true);
@@ -148,20 +146,20 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
   }, [playScenery, runActive]);
 
   useEffect(() => {
-    if (!runActive || sceneryStatus !== 'loading') return;
+    if (!prepareScenery || !runActive || sceneryStatus !== 'loading') return;
     const timer = window.setTimeout(() => setSceneryStatus('retry'), sceneryLoadTimeoutMs);
     return () => window.clearTimeout(timer);
-  }, [runActive, sceneryStatus]);
+  }, [prepareScenery, runActive, sceneryStatus]);
 
   const result = useMemo(() => {
-    const resultDistance = requireFullRoute ? distance : distance >= 0.05 ? distance : plannedDistance;
-    const resultDuration = requireFullRoute ? time : time >= 20 ? time : plannedDuration;
+    const resultDistance = requireFullRoute || useActualStats || distance >= 0.05 ? distance : plannedDistance;
+    const resultDuration = requireFullRoute || useActualStats || time >= 20 ? time : plannedDuration;
     return {
       distance: Number(resultDistance.toFixed(2)),
       duration: resultDuration,
       calories: Math.max(1, Math.round(resultDistance * 65))
     };
-  }, [distance, plannedDistance, plannedDuration, time, requireFullRoute]);
+  }, [distance, plannedDistance, plannedDuration, time, requireFullRoute, useActualStats]);
 
   const pace = distance > 0.01
     ? `${Math.floor(time / 60 / distance)}'${String(Math.floor(((time / 60 / distance) % 1) * 60)).padStart(2, '0')}\"`
@@ -232,7 +230,7 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
           <div><dt>配速</dt><dd>{pace}</dd></div>
           <div><dt>千卡</dt><dd>{Math.round(distance * 65)}</dd></div>
         </dl>
-        {runActive && sceneryStatus === 'loading' && (
+        {prepareScenery && runActive && sceneryStatus === 'loading' && (
           <p className={styles.sceneryNotice} role="status">正在加载视频…</p>
         )}
         {runActive && sceneryStatus === 'retry' && (
@@ -321,12 +319,12 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
                 </div>
               ) : <small>{coinRewards.tracking ? '预计金币将在结算确认后入账。' : '金币仅计入跑步机的有效运动数据。'}</small>}
             </section>}
-            {!simulatedPartial && <section className={styles.summaryMedals} aria-label="获得勋章">
-              <h3><Award size={14} aria-hidden="true" /> 获得勋章</h3>
+            {earnsMedals && medalNames.length > 0 && <section className={styles.summaryMedals} aria-label="获得景点勋章">
+              <h3><Award size={14} aria-hidden="true" /> 获得景点勋章</h3>
               <ul>
-                {MEDALS.slice(0, 3).map(medal => (
-                  <li key={medal.id} title={medal.name} aria-label={medal.name}>
-                    <span aria-hidden="true">{medal.text}</span>
+                {medalNames.map(name => (
+                  <li key={name}>
+                    <Award size={13} aria-hidden="true" />{name}
                   </li>
                 ))}
               </ul>

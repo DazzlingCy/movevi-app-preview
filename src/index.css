@@ -49,6 +49,8 @@ svg { stroke-width: 1.8; }
 }
 
 .phone-shell {
+  --bottom-nav-height: 72px;
+  --bottom-nav-inset: max(10px, env(safe-area-inset-bottom));
   position: relative;
   isolation: isolate;
   width: min(100%, 430px);
@@ -1501,8 +1503,8 @@ body { background: var(--bg); }
   z-index: 18;
   left: 14px;
   right: 14px;
-  bottom: max(10px, env(safe-area-inset-bottom));
-  height: 72px;
+  bottom: var(--bottom-nav-inset);
+  height: var(--bottom-nav-height);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   padding: 7px 10px;
@@ -2230,6 +2232,18 @@ body { background: var(--bg); }
 .switch { background: #30323a; }
 .switch.is-on { background: var(--navy); }
 .toast { background: #f5f5f7; color: #111216; }
+.toast.toast--above-nav {
+  bottom: calc(var(--bottom-nav-inset) + var(--bottom-nav-height) + 12px);
+}
+.toast.toast--dark {
+  width: max-content;
+  transform: translate(-50%, 0);
+  background: #111;
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+  transition: opacity .24s var(--ease);
+}
 
 @keyframes globeBreathe { 50% { transform: scale(1.08); opacity: .62; } }
 

@@ -1,17 +1,23 @@
 import { useId, useRef, useState, type CSSProperties } from 'react';
-import { Check, ChevronLeft, ChevronRight, Coins, Footprints, Gift, Globe2, Route, Sparkle, Users, Wallet, X } from 'lucide-react';
-import { COINS_PER_YUAN, DAILY_COIN_CAP, MILEAGE_REWARDS, ROUTE_REWARDS, STARTER_COIN_REWARDS, WITHDRAWAL_TIERS, formatCoinValue, parseWithdrawalCoins, type CoinEntry, type CoinTrack, type WithdrawalTier } from '../journey/coinRewards';
+import { ArrowLeftRight, Check, ChevronLeft, ChevronRight, Coins, Footprints, Gift, Globe2, Route, Sparkle, Users, Wallet, X } from 'lucide-react';
+import { COINS_PER_CENT, COINS_PER_YUAN, DAILY_COIN_CAP, MILEAGE_REWARDS, ROUTE_REWARDS, STARTER_COIN_REWARDS, WITHDRAWAL_TIERS, cashChange, coinChange, formatCashValue, parseWithdrawalCents, quoteCashExchange, type CoinEntry, type CoinTrack, type WithdrawalTier } from '../journey/coinRewards';
+import { COIN_LOTTERY_NAME, COINS_PER_LANDMARK_MEDAL } from '../journey/medalLottery';
 import type { useCoinRewards } from '../journey/useCoinRewards';
 import Modal from './journey/Modal';
 import styles from './EventsTab.module.css';
 
-interface EventsTabProps {
-  rewards: ReturnType<typeof useCoinRewards>;
+interface BenefitsActions {
   onRun: () => void;
+  onToast: (message: string) => void;
   onSelectMedalLottery: () => void;
   onSelectTeamRelay: () => void;
   onSelectHundredCities: () => void;
 }
+
+type EventsTabProps = { rewards: ReturnType<typeof useCoinRewards> } & (
+  (BenefitsActions & { onBackToLottery?: never })
+  | ({ onBackToLottery: () => void } & Partial<Record<keyof BenefitsActions, never>>)
+);
 
 const numberFormat = new Intl.NumberFormat('zh-CN');
 const entryDate = new Intl.DateTimeFormat('sv-SE', {
@@ -20,6 +26,8 @@ const entryDate = new Intl.DateTimeFormat('sv-SE', {
 const trackNames = { mileage: '累计运动里程', route: '路线通关' };
 const historyTabs = { history: '金币记录', cashHistory: '现金记录' } as const;
 type HistoryTab = keyof typeof historyTabs;
+const exchangeRate = `${numberFormat.format(COINS_PER_YUAN)} 金币兑 ¥1`;
+type ExchangeDraft = ReturnType<typeof quoteCashExchange> & { id: string };
 const fallingCoins = [
   { x: 5, drift: -16, delay: 40, size: 19, tilt: -24 },
   { x: 16, drift: -14, delay: 185, size: 12, tilt: 38 },
@@ -71,36 +79,40 @@ function RewardMilestones({ tiers, value, track, starterClaimed, onClaim }: {
 }
 
 function RewardHistory({ ledger, showCash, showExamples }: { ledger: CoinEntry[]; showCash: boolean; showExamples: boolean }) {
-  const entries = ledger.filter(entry => entry.kind !== 'exercise' || entry.reward.mileage + entry.reward.route > 0)
+  const change = showCash ? cashChange : coinChange;
+  const entries = ledger.filter(entry => change(entry) !== 0)
     .sort((a, b) => b.at - a.at);
-  const formatAmount = (coins: number) => showCash ? formatCoinValue(coins) : `${numberFormat.format(coins)} 金币`;
-  if (!entries.length && showExamples) {
+  if (!entries.length && showExamples && !showCash) {
     return (
       <ul className={styles.history}>
         {(['mileage', 'route'] as const).map((track, index) => (
           <li key={track}>
             <div><strong>{trackNames[track]}奖励</strong><small>{entryDate.format(Date.now() - index * 86_400_000)} · 示例记录</small></div>
-            <b>+{formatAmount(STARTER_COIN_REWARDS[track].coins)}</b>
+            <b>+{STARTER_COIN_REWARDS[track].coins} 金币</b>
           </li>
         ))}
       </ul>
     );
   }
-  if (!entries.length) return <p className={styles.empty}>完成有效运动后，奖励明细会显示在这里。</p>;
+  if (!entries.length) return <p className={styles.empty}>{showCash ? '暂无现金记录，兑换或提现后可在这里查看。' : '完成有效运动后，奖励明细会显示在这里。'}</p>;
   return (
     <ul className={styles.history}>
       {entries.map(entry => {
-        const coins = entry.kind === 'exercise' ? entry.reward.mileage + entry.reward.route : entry.coins;
-        const amount = formatAmount(coins);
+        const delta = change(entry);
+        const amount = showCash ? formatCashValue(Math.abs(delta)) : `${numberFormat.format(Math.abs(delta))} 金币`;
         return (
           <li key={entry.id}>
             <div>
               <strong>{entry.kind === 'starter-claim' ? `${trackNames[entry.track]}奖励`
-                : entry.kind === 'exercise' ? entry.routeName : entry.kind === 'withdrawal' ? '模拟提现' : '演示余额'}</strong>
+                : entry.kind === 'exercise' ? entry.routeName
+                : entry.kind === 'medal-exchange' ? '景点勋章兑换金币'
+                : entry.kind === 'medal-draw' ? COIN_LOTTERY_NAME
+                : entry.kind === 'cash-exchange' ? '金币兑换现金'
+                : entry.kind === 'withdrawal' || entry.kind === 'cash-withdrawal' ? '模拟提现' : '演示余额'}</strong>
               <small>{entryDate.format(entry.at)}</small>
               {entry.kind === 'exercise' && !showCash && <small>里程 +{entry.reward.mileage} · 通关 +{entry.reward.route}</small>}
             </div>
-            <b>{entry.kind === 'withdrawal' ? '−' : '+'}{amount}</b>
+            <b>{delta < 0 ? '−' : '+'}{amount}</b>
           </li>
         );
       })}
@@ -108,13 +120,19 @@ function RewardHistory({ ledger, showCash, showExamples }: { ledger: CoinEntry[]
   );
 }
 
-export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSelectTeamRelay, onSelectHundredCities }: EventsTabProps) {
+export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLottery, onSelectTeamRelay, onSelectHundredCities, onBackToLottery }: EventsTabProps) {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [historyTab, setHistoryTab] = useState<HistoryTab | null>(null);
   const [earningsOpen, setEarningsOpen] = useState(false);
+  const showEarnings = earningsOpen || !!onBackToLottery;
   const [tier, setTier] = useState<WithdrawalTier | 'custom'>(1);
   const [customAmount, setCustomAmount] = useState('');
   const [notice, setNotice] = useState('');
+  const [exchangeDraft, setExchangeDraft] = useState<ExchangeDraft | null>(null);
+  const [exchangePending, setExchangePending] = useState(false);
+  const [exchangeError, setExchangeError] = useState('');
+  const exchanging = useRef(false);
+  const exchangeTrigger = useRef<HTMLButtonElement>(null);
   const [compact, setCompact] = useState(false);
   const [claimedTrack, setClaimedTrack] = useState<CoinTrack | null>(null);
   const [claimError, setClaimError] = useState('');
@@ -122,22 +140,60 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
   const tasksHeading = useRef<HTMLHeadingElement>(null);
   const walletRef = useRef<HTMLElement>(null);
   const withdrawalId = useRef<string | null>(null);
+  const withdrawing = useRef(false);
+  const [withdrawPending, setWithdrawPending] = useState(false);
+  const [withdrawalResult, setWithdrawalResult] = useState<number | null>(null);
+  const earningsBack = useRef<HTMLButtonElement>(null);
   const earningsTrigger = useRef<HTMLElement | null>(null);
   const historyTrigger = useRef<HTMLElement | null>(null);
   const [withdrawn, setWithdrawn] = useState(false);
   const headingId = useId();
   const activities = [
-    { name: '勋章盲盒抽奖', description: '用盲盒券兑换抽奖机会', icon: Gift, theme: 'gold', select: onSelectMedalLottery },
-    { name: '百人百城计划', icon: Globe2, theme: 'red', select: onSelectHundredCities },
+    { name: COIN_LOTTERY_NAME, description: '勋章兑金币，金币抽现金红包', icon: Gift, theme: 'gold', select: onSelectMedalLottery },
+    { name: '百人百城计划', description: '打卡全球城市，圆梦旅行大奖', icon: Globe2, theme: 'red', select: onSelectHundredCities },
     { name: '环球搭子小队', description: '双人组队，完成城市路线', icon: Users, theme: 'sand', select: onSelectTeamRelay },
   ];
   const routeCount = Math.min(rewards.today.routes.size, ROUTE_REWARDS.length);
   const amount = tier === 'custom' ? customAmount : tier;
-  const withdrawalCoins = parseWithdrawalCoins(amount);
-  const canWithdraw = rewards.demo && !withdrawn && withdrawalCoins !== null && rewards.balance >= withdrawalCoins;
-  const invalidAmount = tier === 'custom' && customAmount.trim() !== '' && withdrawalCoins === null;
-  const insufficientBalance = !withdrawn && withdrawalCoins !== null && withdrawalCoins > rewards.balance;
-  const demoCreditLoaded = rewards.ledger.some(entry => entry.kind === 'demo-credit');
+  const withdrawalCents = parseWithdrawalCents(amount);
+  const canWithdraw = rewards.canSimulateWithdrawal && !withdrawPending && !withdrawn && withdrawalCents !== null && rewards.cashCents >= withdrawalCents;
+  const invalidAmount = tier === 'custom' && customAmount.trim() !== '' && withdrawalCents === null;
+  const insufficientBalance = !withdrawn && withdrawalCents !== null && withdrawalCents > rewards.cashCents;
+  const demoCreditLoaded = rewards.ledger.some(entry => entry.kind === 'demo-credit' || entry.kind === 'demo-cash-credit');
+  const cashLabel = formatCashValue(rewards.cashCents);
+  const withdrawalHint = invalidAmount ? '请输入大于 0、最多两位小数的金额。'
+    : insufficientBalance ? `现金余额不足，可用现金 ${cashLabel}`
+      : !rewards.canSimulateWithdrawal ? '微信提现暂未开通。' : `可用现金 ${cashLabel}`;
+
+  const openCashExchange = () => {
+    setExchangeError('');
+    setExchangeDraft({ ...quoteCashExchange(rewards.balance), id: `cash-exchange-${crypto.getRandomValues(new Uint32Array(4)).join('-')}` });
+  };
+  const closeCashExchange = () => {
+    if (exchanging.current) return;
+    setExchangeDraft(null);
+    requestAnimationFrame(() => exchangeTrigger.current?.focus({ preventScroll: true }));
+  };
+  const submitCashExchange = async () => {
+    if (!exchangeDraft?.coins || exchanging.current) return;
+    exchanging.current = true;
+    setExchangePending(true);
+    setExchangeError('');
+    try {
+      if (await rewards.exchangeCash(exchangeDraft.coins, exchangeDraft.id)) {
+        onToast?.(`兑换成功，${formatCashValue(exchangeDraft.cents)} 已存入现金余额。`);
+        setExchangeDraft(null);
+        requestAnimationFrame(() => exchangeTrigger.current?.focus({ preventScroll: true }));
+      } else {
+        setExchangeError('余额已变化或兑换未完成，请关闭后重试。');
+      }
+    } catch {
+      setExchangeError('暂时无法兑换，请重试。');
+    } finally {
+      exchanging.current = false;
+      setExchangePending(false);
+    }
+  };
   const claimStarter = async (track: CoinTrack) => {
     if (claiming.current) return;
     claiming.current = true;
@@ -168,17 +224,41 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
     setEarningsOpen(true);
   };
   const closeEarnings = () => {
+    if (withdrawing.current) return;
     setEarningsOpen(false);
     requestAnimationFrame(() => earningsTrigger.current?.focus({ preventScroll: true }));
   };
-  const submitWithdrawal = () => {
-    if (!canWithdraw || withdrawalCoins === null) return;
+  const submitWithdrawal = async () => {
+    if (!canWithdraw || withdrawalCents === null || withdrawing.current) return;
+    withdrawing.current = true;
+    setWithdrawPending(true);
+    setNotice('');
     const id = withdrawalId.current ??= `withdraw-${crypto.getRandomValues(new Uint32Array(4)).join('-')}`;
-    if (rewards.withdraw(amount, id)) {
-      setWithdrawn(true);
-      setNotice(`已记录模拟提现 ${formatCoinValue(withdrawalCoins)} 至微信钱包。`);
-    } else {
+    try {
+      if (await rewards.withdraw(amount, id)) {
+        setWithdrawn(true);
+        setWithdrawalResult(withdrawalCents);
+      } else {
+        setNotice('余额已更新或本地记录保存失败，请重试。');
+      }
+    } catch {
       setNotice('余额已更新或本地记录保存失败，请重试。');
+    } finally {
+      withdrawing.current = false;
+      setWithdrawPending(false);
+    }
+  };
+
+  const dismissWithdrawalResult = () => {
+    setWithdrawalResult(null);
+    requestAnimationFrame(() => earningsBack.current?.focus({ preventScroll: true }));
+  };
+
+  const loadDemoBalance = async () => {
+    try {
+      setNotice(await rewards.loadDemoBalance() ? '已载入 ¥1 演示余额。' : '演示余额已载入或本地记录保存失败。');
+    } catch {
+      setNotice('本地记录保存失败，请重试。');
     }
   };
   const openHistory = (kind: HistoryTab, trigger: HTMLElement) => {
@@ -194,7 +274,7 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
 
   return (
     <>
-      <main className={styles.page} id={earningsOpen || historyTab ? undefined : 'main-content'} aria-label="福利" inert={earningsOpen || !!historyTab || rulesOpen || !!claimedTrack}
+      {!onBackToLottery && <main className={styles.page} id={earningsOpen || historyTab ? undefined : 'main-content'} aria-label="福利" inert={earningsOpen || !!historyTab || rulesOpen || !!claimedTrack || !!exchangeDraft}
         onScroll={event => setCompact(event.currentTarget.scrollTop >= (walletRef.current?.offsetHeight ?? Infinity))}>
         <div className={styles.stickyAnchor}>
           {compact && <div className={styles.stickyWallet}>
@@ -202,8 +282,8 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
               <button type="button" onClick={event => openHistory('history', event.currentTarget)} aria-label={`金币明细，${numberFormat.format(rewards.balance)} 金币`}>
                 <Coins size={17} aria-hidden="true" /><b>{numberFormat.format(rewards.balance)}</b><span>金币</span>
               </button>
-              <button type="button" onClick={event => openHistory('cashHistory', event.currentTarget)} aria-label={`现金明细，${formatCoinValue(rewards.balance)}`}>
-                <Wallet size={16} aria-hidden="true" /><b>{formatCoinValue(rewards.balance)}</b>
+              <button type="button" onClick={event => openHistory('cashHistory', event.currentTarget)} aria-label={`现金明细，${cashLabel}`}>
+                <Wallet size={16} aria-hidden="true" /><b>{cashLabel}</b>
               </button>
             </div>
             <button type="button" onClick={openEarnings}>去提现 <ChevronRight size={15} aria-hidden="true" /></button>
@@ -218,10 +298,15 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
             </button>
             <button type="button" onClick={event => openHistory('cashHistory', event.currentTarget)}>
               <span><Wallet className={styles.walletCash} size={15} aria-hidden="true" />现金收益 (元)<ChevronRight size={14} aria-hidden="true" /></span>
-              <strong>{formatCoinValue(rewards.balance)}</strong>
+              <strong>{cashLabel}</strong>
             </button>
           </div>
-          <div className={styles.walletBottom}><span>0点自动兑换成金币</span><button type="button" onClick={openEarnings}>去提现 <ChevronRight size={15} aria-hidden="true" /></button></div>
+          <div className={styles.walletBottom}>
+            <button className={styles.exchangeLink} ref={exchangeTrigger} type="button" aria-haspopup="dialog" onClick={openCashExchange}>
+              <ArrowLeftRight size={15} aria-hidden="true" />去兑换 <ChevronRight size={14} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={openEarnings}>去提现 <ChevronRight size={15} aria-hidden="true" /></button>
+          </div>
         </section>
 
         <div className={styles.content}>
@@ -261,19 +346,20 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
           </section>
           <p className={styles.footer}><button type="button" onClick={() => setRulesOpen(true)}>活动规则 <ChevronRight size={13} aria-hidden="true" /></button></p>
         </div>
-      </main>
+      </main>}
 
-      {earningsOpen && (
-        <main className={`${styles.page} ${styles.earningsPage}`} id={historyTab ? undefined : 'main-content'} aria-labelledby="earnings-title" inert={!!historyTab || rulesOpen}>
+      {showEarnings && (
+        <main className={`${styles.page} ${styles.earningsPage}`} id={historyTab ? undefined : 'main-content'} aria-labelledby="earnings-title"
+          inert={!!historyTab || rulesOpen || withdrawPending || withdrawalResult !== null}>
           <header className={styles.earningsHeader}>
             <nav className={styles.earningsNav} aria-label="收益页导航">
-              <button type="button" autoFocus onClick={closeEarnings} aria-label="返回福利"><ChevronLeft size={24} aria-hidden="true" /></button>
+              <button type="button" autoFocus ref={earningsBack} disabled={withdrawPending} onClick={onBackToLottery ?? closeEarnings} aria-label={onBackToLottery ? `返回${COIN_LOTTERY_NAME}` : '返回福利'}><ChevronLeft size={24} aria-hidden="true" /></button>
               <h1 id="earnings-title">我的收益</h1>
               <button type="button" onClick={() => setRulesOpen(true)}>规则</button>
             </nav>
             <div className={`${styles.walletTop} ${styles.earningsBalance}`}>
               <button type="button" onClick={event => openHistory('history', event.currentTarget)}><span>金币收益 (金币)<ChevronRight size={14} aria-hidden="true" /></span><strong>{numberFormat.format(rewards.balance)}</strong></button>
-              <button type="button" onClick={event => openHistory('cashHistory', event.currentTarget)}><span>现金收益 (元)<ChevronRight size={14} aria-hidden="true" /></span><strong>{formatCoinValue(rewards.balance)}</strong></button>
+              <button type="button" onClick={event => openHistory('cashHistory', event.currentTarget)}><span>现金收益 (元)<ChevronRight size={14} aria-hidden="true" /></span><strong>{cashLabel}</strong></button>
             </div>
           </header>
 
@@ -282,7 +368,8 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
             <p className={styles.sheetNote}>提现后1-3个工作日内到账</p>
             <div className={styles.withdrawTiers} role="group" aria-label="提现档位">
               {WITHDRAWAL_TIERS.map(value => (
-                <button key={value} type="button" aria-pressed={tier === value} disabled={withdrawn} onClick={() => {
+                <button key={value} type="button" aria-pressed={tier === value} disabled={withdrawn || withdrawPending}
+                  aria-describedby={tier === value && insufficientBalance ? 'custom-withdrawal-hint' : undefined} onClick={() => {
                   setTier(value);
                   setCustomAmount('');
                 }}>
@@ -296,20 +383,30 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
                 value={customAmount} onChange={event => {
                   setTier('custom');
                   setCustomAmount(event.target.value);
-                }} disabled={withdrawn}
-                aria-invalid={invalidAmount || undefined}
+                }} disabled={withdrawn || withdrawPending}
+                aria-invalid={(invalidAmount || (tier === 'custom' && insufficientBalance)) || undefined}
                 aria-describedby="custom-withdrawal-hint" />
-              <small id="custom-withdrawal-hint" role="status">
-                {invalidAmount ? '请输入大于 0、最多两位小数的金额。' : tier === 'custom' && insufficientBalance ? '余额不足。' : `可用余额 ${formatCoinValue(rewards.balance)}`}
-              </small>
+              <small id="custom-withdrawal-hint" data-error={invalidAmount || insufficientBalance} role="status">{withdrawalHint}</small>
             </div>
             <button className={`${styles.confirm} ${styles.confirmWechat}`} type="button" disabled={!canWithdraw} onClick={submitWithdrawal}>
-              立即提现
+              {withdrawPending ? '提交中…' : '立即提现'}
             </button>
-            {rewards.demo && !demoCreditLoaded && <button className={styles.demo} type="button" onClick={() => setNotice(rewards.loadDemoBalance() ? '已载入 ¥1 演示余额。' : '演示余额已载入或本地记录保存失败。')}>载入 ¥1 演示余额</button>}
+            {rewards.demo && !demoCreditLoaded && <button className={styles.demo} type="button" onClick={loadDemoBalance}>载入 ¥1 演示余额</button>}
             <p className={styles.notice} role="status">{notice}</p>
           </section>
         </main>
+      )}
+
+      {withdrawalResult !== null && (
+        <Modal labelId={headingId} className={`${styles.sheet} ${styles.withdrawalResult}`} backdropClassName={`${styles.backdrop} ${styles.withdrawalBackdrop}`}>
+          <span className={styles.withdrawalSuccessIcon} aria-hidden="true"><Check size={23} strokeWidth={2.5} /></span>
+          <h2 id={headingId}>提交成功</h2>
+          <dl className={styles.withdrawalReceipt}>
+            <dt>提现金额</dt><dd>{formatCashValue(withdrawalResult)}</dd>
+          </dl>
+          <p className={styles.sheetNote}>预计 1-3 个工作日内到账</p>
+          <button className={styles.confirm} type="button" onClick={dismissWithdrawalResult}>知道了</button>
+        </Modal>
       )}
 
       {historyTab && (
@@ -322,9 +419,9 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
             </nav>
             <dl className={styles.historyBalance}>
               <div><dt>金币收益 (金币)</dt><dd>{numberFormat.format(rewards.balance)}</dd></div>
-              <div><dt>现金收益 (元)</dt><dd>{formatCoinValue(rewards.balance)}</dd></div>
+              <div><dt>现金收益 (元)</dt><dd>{cashLabel}</dd></div>
             </dl>
-            <p className={styles.historyRate}>10,000 金币兑 ¥1</p>
+            <p className={styles.historyRate}>{exchangeRate}，确认兑换后计入现金余额。</p>
           </header>
           <section className={styles.historyCard} aria-label={historyTabs[historyTab]}>
             <div className={styles.historyTabs} role="group" aria-label="记录类型">
@@ -335,6 +432,29 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
             <RewardHistory ledger={rewards.ledger} showCash={historyTab === 'cashHistory'} showExamples={rewards.localPreview || rewards.demo} />
           </section>
         </main>
+      )}
+
+      {exchangeDraft && (
+        <Modal labelId={headingId} onClose={closeCashExchange} className={styles.sheet} backdropClassName={styles.backdrop}>
+          <header className={styles.sheetHeader}>
+            <h2 id={headingId}>金币兑现金</h2>
+            <button type="button" onClick={closeCashExchange} disabled={exchangePending} aria-label="取消兑换"><X size={21} aria-hidden="true" /></button>
+          </header>
+          <p className={styles.sheetNote}>{exchangeRate}</p>
+          <dl className={styles.exchangeAmounts}>
+            <div><dt>扣除金币</dt><dd>{numberFormat.format(exchangeDraft.coins)}</dd></div>
+            <div><dt>获得现金</dt><dd>{formatCashValue(exchangeDraft.cents)}</dd></div>
+          </dl>
+          <p className={styles.sheetNote}>{exchangeDraft.coins === 0
+            ? `至少需要 ${COINS_PER_CENT} 金币才能兑换 ¥0.01。`
+            : exchangeDraft.coins > rewards.balance ? '金币余额已变化，请关闭后重新发起兑换。'
+              : '确认后，现金将存入钱包，不足一分钱的金币继续保留。'}</p>
+          <button className={styles.confirm} type="button" onClick={submitCashExchange}
+            disabled={!exchangeDraft.coins || exchangeDraft.coins > rewards.balance || exchangePending}>
+            {exchangePending ? '兑换中…' : '确认兑换'}
+          </button>
+          {exchangeError && <p className={styles.notice} role="alert">{exchangeError}</p>}
+        </Modal>
       )}
 
       {claimedTrack && (
@@ -370,10 +490,10 @@ export default function EventsTab({ rewards, onRun, onSelectMedalLottery, onSele
             </li>
             <li>
               <strong>奖励结算。</strong>里程和通关奖励可叠加，达标后在结算时自动入账，每档每天只发放一次。
-              每人每天最多获得 {DAILY_COIN_CAP} 金币。每日任务于北京时间 0 点重置，已入账金币继续保留。
+              运动任务每天最多获得 {DAILY_COIN_CAP} 金币。每日任务于北京时间 0 点重置，已入账金币继续保留。
             </li>
             <li>
-              <strong>兑换与提现。</strong>{numberFormat.format(COINS_PER_YUAN)} 金币固定兑换 ¥1。
+              <strong>兑换与提现。</strong>{exchangeRate}，手动确认后计入现金余额。每次最低兑换 ¥0.01，不足一分钱的金币继续保留。
               微信钱包提现可选 {WITHDRAWAL_TIERS.map(amount => `¥${amount}`).join('、')} 或自定义金额。
               提现金额不得超过可提现余额，提交申请后 1–3 个工作日内到账。
             </li>
