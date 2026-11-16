@@ -2183,20 +2183,22 @@ export default function JourneyApp() {
         : <motion.div className="screen-layer" key="home" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
           <div className="screen-layer" inert={scenePickerOpen}>
             {selectedScene ? (
-              <RunSceneContentView
-                scene={selectedScene}
-                homeControls={<>
-                  <div className="home-destination-actions">
-                    <HomeRunModeButton onClick={openRunScenes} />
-                    <HomeCityListButton hasNewCity={newCityIds.length > 0} label="城市列表，切回城市卡片模式" onClick={() => selectRunScene(null)} />
-                  </div>
-                  <HomeQuickActions deviceConnected={deviceConnected} onDevice={() => setUtilityMode('device')} onLegacyFeature={openLegacyFeature} />
-                </>}
-                routeIndex={sceneRouteIndex.current}
-                onRouteIndexChange={index => { sceneRouteIndex.current = index; }}
-                onOpenRunScenes={openRunScenes}
-                onRouteClick={(entry, route, index) => { sceneRouteIndex.current = index; setSceneRoute({ entry, route }); }}
-              />
+              <Fragment key={selectedScene.id}>
+                <RunSceneContentView
+                  scene={selectedScene}
+                  homeControls={<>
+                    <div className="home-destination-actions">
+                      <HomeRunModeButton onClick={openRunScenes} />
+                      <HomeCityListButton hasNewCity={newCityIds.length > 0} label="城市列表，切回城市卡片模式" onClick={() => selectRunScene(null)} />
+                    </div>
+                    <HomeQuickActions deviceConnected={deviceConnected} onDevice={() => setUtilityMode('device')} onLegacyFeature={openLegacyFeature} />
+                  </>}
+                  routeIndex={sceneRouteIndex.current}
+                  onRouteIndexChange={index => { sceneRouteIndex.current = index; }}
+                  onOpenRunScenes={openRunScenes}
+                  onRouteClick={(entry, route, index) => { sceneRouteIndex.current = index; setSceneRoute({ entry, route }); }}
+                />
+              </Fragment>
             ) : (
                 <HomePage state={state} newCityIds={newCityIds} recommendations={recommendations} todayExercise={dailyExercise.totals} dailyGoalKm={dailyExercise.goalKm} allowGoalAnimation={!showDeviceConnectedPrompt && !reduceMotion} onEditDailyGoal={() => { setNotice(''); setDailyGoalOpen(true); }} city={homeCity} deviceConnected={deviceConnected} onRoutes={openCity} onRecommendations={openRecommendations} onRunScenes={openRunScenes} onBrowseCity={setHomeCityId} onSelectNextCity={(cityId) => { setSelectedCandidateId(cityId); dispatch({ type: 'SELECT_NEXT_CITY', cityId }); }} focusNextStation={focusNextStation} onNextStationFocused={clearNextStationFocus} onDevice={() => setUtilityMode('device')} onLegacyFeature={openLegacyFeature} onCarouselEnd={() => setNotice('更多城市敬请期待', 'centered')} />
             )}

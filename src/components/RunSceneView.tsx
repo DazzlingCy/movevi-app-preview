@@ -5,8 +5,8 @@ import styles from './RunSceneView.module.css';
 
 const sceneIcons = { beach: Waves, forest: Trees, architecture: Landmark, midday: Coffee };
 const sceneGroups = [
-  { id: 'natural', label: '自然环境', upcoming: { label: '公路', image: 'recommendations/feature/2c44b59aba219bafb683.webp', icon: Route } },
-  { id: 'lifestyle', label: '生活场景', upcoming: { label: '碎片时间', image: 'run-scenes/break-singapore.webp', icon: Clock3 } },
+  { id: 'natural', label: '自然环境', upcoming: { label: '公路', image: 'road', icon: Route } },
+  { id: 'lifestyle', label: '生活场景', upcoming: { label: '碎片时间', image: 'break-singapore', icon: Clock3 } },
 ] as const;
 
 interface Props {
@@ -65,13 +65,13 @@ export default function RunSceneView({ selection, onSelect, onUnavailable, onClo
                   const Icon = sceneIcons[scene.id];
                   const active = selection?.id === scene.id;
                   return <button key={scene.id} type="button" aria-pressed={active} onClick={() => onSelect(scene)}>
-                    <img src={runSceneImage(scene.entries[0])} alt="" decoding="async" />
+                    <img src={runSceneImage(scene.entries[0], 'thumbnail')} alt="" width={384} height={334} decoding="async" />
                     <span className={styles.tagLabel}><Icon size={17} aria-hidden="true" />{scene.label}</span>
                     {active && <Check className={styles.tagCheck} size={14} aria-hidden="true" />}
                   </button>;
                 })}
                 <button className={styles.upcoming} type="button" onClick={onUnavailable}>
-                  <img src={`${import.meta.env.BASE_URL}images/${group.upcoming.image}`} alt="" decoding="async" />
+                  <img src={runSceneImage(group.upcoming, 'thumbnail')} alt="" width={384} height={334} decoding="async" />
                   <span className={styles.tagLabel}><group.upcoming.icon size={17} aria-hidden="true" />{group.upcoming.label}</span>
                 </button>
               </div>

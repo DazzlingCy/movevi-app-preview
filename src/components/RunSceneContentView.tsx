@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { getSceneContentRoute, runSceneImage, type RunScene, type SceneContent } from '../journey/runScenes';
 import type { JourneyRoute } from '../journey/types';
 import RouteCardRail from './RouteCardRail';
@@ -14,15 +14,17 @@ interface Props {
 }
 
 export default function RunSceneContentView({ scene, homeControls, routeIndex, onRouteIndexChange, onOpenRunScenes, onRouteClick }: Props) {
+  const [activeIndex, setActiveIndex] = useState(routeIndex);
   const backdropStyle = { '--scene-background-hue': scene.backdropHue } as CSSProperties;
   const cards = scene.entries.map((entry, index) => {
     const route = getSceneContentRoute(entry);
     if (!route) return null;
+    const active = index === activeIndex;
     return (
       <article key={entry.image} className={styles.route + ' ' + styles.featured + ' ' + styles.sceneCard}>
         <span className={styles.cover}>
           <img className={styles.image} src={runSceneImage(entry)} alt="" width="550" height="960" decoding="async"
-            loading={Math.abs(index - routeIndex) <= 1 ? 'eager' : 'lazy'} fetchPriority={index === routeIndex ? 'high' : 'low'} />
+            loading={active ? 'eager' : 'lazy'} fetchPriority={active ? 'high' : 'low'} />
         </span>
         <span className={styles.routeType + ' ' + styles.sceneType}>{scene.label}</span>
         <span className={styles.routeBody}>
@@ -40,8 +42,11 @@ export default function RunSceneContentView({ scene, homeControls, routeIndex, o
       <header className={styles.homeBar}>{homeControls}</header>
       <div className={styles.content}>
         <header className={styles.listHeader}><h1>{scene.label}</h1></header>
-        <div key={scene.id} className={styles.sceneRail} aria-label={scene.label + '场景'}>
-          <RouteCardRail items={cards} initialIndex={routeIndex} onSelect={onRouteIndexChange} onSwipePastStart={onOpenRunScenes} />
+        <div className={styles.sceneRail} aria-label={scene.label + '场景'}>
+          <RouteCardRail items={cards} initialIndex={routeIndex} onSelect={index => {
+            setActiveIndex(index);
+            onRouteIndexChange(index);
+          }} onSwipePastStart={onOpenRunScenes} />
         </div>
       </div>
     </main>

@@ -22,8 +22,9 @@ export interface RunScene {
 
 export const CITY_CARD_MODE_LABEL = '城市卡片';
 
-export function runSceneImage(entry: SceneContent) {
-  return import.meta.env.BASE_URL + 'images/run-scenes/' + entry.image + '.webp';
+export function runSceneImage(entry: Pick<SceneCover, 'image'>, size: 'cover' | 'thumbnail' = 'cover') {
+  const folder = size === 'thumbnail' ? 'images/run-scenes/thumbnails/' : 'images/run-scenes/';
+  return import.meta.env.BASE_URL + folder + entry.image + '.webp';
 }
 
 export const RUN_SCENES: readonly RunScene[] = [
