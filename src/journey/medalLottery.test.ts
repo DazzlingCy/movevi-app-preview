@@ -85,4 +85,3 @@ test('draws debit the same wallet and avoid replayed IDs and depleted prize tier
   assert.equal(getMedalLotteryStock(getMedalDraws(ledger)).reduce((sum, count) => sum + count, 0), MEDAL_LOTTERY_POOL_SIZE - 2);
   assert.equal(recordMedalDraw(ledger, 'draw-3', now), null);
 });
-

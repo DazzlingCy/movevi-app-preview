@@ -351,4 +351,3 @@
 .dialog li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f1dcc3; font-size: 14px; }
 .dialog button { width: 100%; min-height: 44px; border: 0; border-radius: 99px; background: #ffd46b; color: #652900; font-weight: 800; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .disk { --spin-transition: none; } }
-

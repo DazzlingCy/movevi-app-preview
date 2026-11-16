@@ -140,4 +140,3 @@
 .cityList { display: grid; margin: 0; padding: 0; list-style: none; }
 .cityList button { display: grid; width: 100%; min-height: 54px; grid-template-columns: 43px minmax(0, 1fr) 20px; align-items: center; gap: 10px; padding: 5px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: inherit; font-size: 14px; text-align: start; cursor: pointer; }
 .cityList button > :first-child { width: 43px; height: 40px; border-radius: 6px; object-fit: cover; overflow: hidden; }
-

@@ -91,4 +91,3 @@ export default function HundredCitiesInfoView({ kind, onBack }: { kind: 'ranking
     </div>
   );
 }
-

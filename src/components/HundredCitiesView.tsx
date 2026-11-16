@@ -185,4 +185,3 @@ export default function HundredCitiesView({ cities, onBack, onStart, onExploreCi
     </div>
   );
 }
-

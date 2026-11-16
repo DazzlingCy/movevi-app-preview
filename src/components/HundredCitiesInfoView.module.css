@@ -52,4 +52,3 @@
 .rulesCard h2 { margin: 0 0 15px; font-size: clamp(19px, 5.5cqi, 25px); font-weight: 850; }
 .rulesCard ol { display: grid; gap: 14px; margin: 0; padding-inline-start: 1.3em; color: var(--muted); font-size: clamp(12px, 3.5cqi, 15px); line-height: 1.5; list-style: decimal; }
 .rulesCard li { padding-inline-start: 2px; }
-
