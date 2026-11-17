@@ -14,12 +14,16 @@ test('five preview medals are available and ten exchanged medals credit 5,000 co
   assert.equal(coinBalance([seed]), 5_000);
 });
 
-test('two medals fund one draw, repeated redemption does not add coins or affect daily rewards', () => {
+test('one medal funds one draw, repeated redemption does not add coins or affect daily rewards', () => {
   const [firstMedal, secondMedal] = PREVIEW_AVAILABLE_MEDALS;
   const first = recordMedalExchange([], [firstMedal], now);
   assert.ok(first);
   assert.equal(coinBalance([first]), 500);
-  assert.equal(recordMedalDraw([first], 'draw-1', now), null);
+  const draw = recordMedalDraw([first], 'draw-1', now, 0);
+  assert.ok(draw);
+  assert.equal(draw.coins, 500);
+  assert.equal(coinBalance([first, draw]), 0);
+  assert.equal(recordMedalDraw([first, draw], 'draw-2', now), null);
   const second = recordMedalExchange([first], [firstMedal, secondMedal, secondMedal], now);
   assert.ok(second);
   assert.equal(second.coins, 500);
@@ -28,11 +32,7 @@ test('two medals fund one draw, repeated redemption does not add coins or affect
   assert.equal(coinDayProgress(ledger, now).earned, 0);
   assert.equal(recordMedalExchange(ledger, [firstMedal, secondMedal], now), null);
   assert.deepEqual(getAvailableMedals(ledger, PREVIEW_AVAILABLE_MEDALS), PREVIEW_AVAILABLE_MEDALS.slice(2));
-  const draw = recordMedalDraw(ledger, 'draw-1', now, 0);
-  assert.ok(draw);
-  assert.equal(draw.coins, 1_000);
-  assert.equal(coinBalance([...ledger, draw]), 0);
-  assert.deepEqual(readCoinLedger(JSON.stringify([...ledger, draw])), [...ledger, draw]);
+  assert.deepEqual(readCoinLedger(JSON.stringify([first, draw, second])), [first, draw, second]);
 });
 
 test('previous medal exchange and draw amounts survive a reload', () => {
@@ -40,12 +40,16 @@ test('previous medal exchange and draw amounts survive a reload', () => {
   assert.ok(exchange);
   const draw = recordMedalDraw([exchange], 'draw-before-price-change', now, 0);
   assert.ok(draw);
-  const history = [{ ...exchange, coins: 10_000 }, { ...draw, coins: 5_000 }];
+  const history = [
+    { ...exchange, coins: 10_000 },
+    { ...draw, coins: 5_000 },
+    { ...draw, id: 'draw-at-1000', coins: 1_000, prizeIndex: 1 },
+  ];
   const ledger = readCoinLedger(JSON.stringify(history));
   assert.deepEqual(ledger, history);
-  assert.equal(coinBalance(ledger), 5_000);
+  assert.equal(coinBalance(ledger), 4_000);
   assert.equal(recordMedalExchange(ledger, PREVIEW_EXCHANGED_MEDALS, now), null);
-  assert.deepEqual(getMedalDraws(ledger), [draw.prizeIndex]);
+  assert.deepEqual(getMedalDraws(ledger), [1, draw.prizeIndex]);
 });
 
 test('settlement credits only valid route runs and uses one medal per configured landmark', () => {
@@ -70,12 +74,12 @@ test('settlement credits only valid route runs and uses one medal per configured
 });
 
 test('draws debit the same wallet and avoid replayed IDs and depleted prize tiers', () => {
-  const seed = recordMedalExchange([], PREVIEW_EXCHANGED_MEDALS.slice(0, 4), now);
+  const seed = recordMedalExchange([], PREVIEW_EXCHANGED_MEDALS.slice(0, 2), now);
   assert.ok(seed);
   const first = recordMedalDraw([seed], 'draw-1', now, 0);
   assert.ok(first);
   assert.equal(first.prizeIndex, 0);
-  assert.equal(coinBalance([seed, first]), 1_000);
+  assert.equal(coinBalance([seed, first]), 500);
   assert.equal(recordMedalDraw([seed, first], 'draw-1', now, 0), null);
   const second = recordMedalDraw([seed, first], 'draw-2', now, 0);
   assert.ok(second);

@@ -143,6 +143,10 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
   const withdrawing = useRef(false);
   const [withdrawPending, setWithdrawPending] = useState(false);
   const [withdrawalResult, setWithdrawalResult] = useState<number | null>(null);
+  const [wechatDialog, setWechatDialog] = useState<'bind' | 'unbind' | null>(null);
+  const [wechatPending, setWechatPending] = useState(false);
+  const [wechatError, setWechatError] = useState('');
+  const wechatTrigger = useRef<HTMLButtonElement>(null);
   const earningsBack = useRef<HTMLButtonElement>(null);
   const earningsTrigger = useRef<HTMLElement | null>(null);
   const historyTrigger = useRef<HTMLElement | null>(null);
@@ -151,19 +155,21 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
   const activities = [
     { name: COIN_LOTTERY_NAME, description: '勋章兑金币，金币抽现金红包', icon: Gift, theme: 'gold', select: onSelectMedalLottery },
     { name: '百人百城计划', description: '打卡全球城市，圆梦旅行大奖', icon: Globe2, theme: 'red', select: onSelectHundredCities },
-    { name: '环球搭子小队', description: '双人组队，完成城市路线', icon: Users, theme: 'sand', select: onSelectTeamRelay },
-  ];
+    { name: '环球搭子小队', description: '双人组队，完成城市路线', icon: Users, theme: 'sand', select: onSelectTeamRelay, hidden: true },
+  ].filter(activity => !activity.hidden);
   const routeCount = Math.min(rewards.today.routes.size, ROUTE_REWARDS.length);
   const amount = tier === 'custom' ? customAmount : tier;
   const withdrawalCents = parseWithdrawalCents(amount);
-  const canWithdraw = rewards.canSimulateWithdrawal && !withdrawPending && !withdrawn && withdrawalCents !== null && rewards.cashCents >= withdrawalCents;
+  const canWithdraw = rewards.canSimulateWithdrawal && rewards.wechatBound && !withdrawPending && !withdrawn
+    && withdrawalCents !== null && rewards.cashCents >= withdrawalCents;
   const invalidAmount = tier === 'custom' && customAmount.trim() !== '' && withdrawalCents === null;
   const insufficientBalance = !withdrawn && withdrawalCents !== null && withdrawalCents > rewards.cashCents;
   const demoCreditLoaded = rewards.ledger.some(entry => entry.kind === 'demo-credit' || entry.kind === 'demo-cash-credit');
   const cashLabel = formatCashValue(rewards.cashCents);
   const withdrawalHint = invalidAmount ? '请输入大于 0、最多两位小数的金额。'
     : insufficientBalance ? `现金余额不足，可用现金 ${cashLabel}`
-      : !rewards.canSimulateWithdrawal ? '微信提现暂未开通。' : `可用现金 ${cashLabel}`;
+      : !rewards.canSimulateWithdrawal ? '微信提现暂未开通。'
+        : !rewards.wechatBound ? `可用现金 ${cashLabel}，请先绑定微信。` : `可用现金 ${cashLabel}`;
 
   const openCashExchange = () => {
     setExchangeError('');
@@ -227,6 +233,26 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
     if (withdrawing.current) return;
     setEarningsOpen(false);
     requestAnimationFrame(() => earningsTrigger.current?.focus({ preventScroll: true }));
+  };
+  const closeWechatDialog = () => {
+    setWechatDialog(null);
+    requestAnimationFrame(() => wechatTrigger.current?.focus({ preventScroll: true }));
+  };
+  const submitWechatBinding = async () => {
+    if (!wechatDialog || wechatPending) return;
+    setWechatPending(true);
+    setWechatError('');
+    try {
+      if (await rewards.setWechatBinding(wechatDialog === 'bind')) {
+        closeWechatDialog();
+        return;
+      }
+      setWechatError('绑定状态保存失败，请重试。');
+    } catch {
+      setWechatError('绑定状态保存失败，请重试。');
+    } finally {
+      setWechatPending(false);
+    }
   };
   const submitWithdrawal = async () => {
     if (!canWithdraw || withdrawalCents === null || withdrawing.current) return;
@@ -350,7 +376,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
 
       {showEarnings && (
         <main className={`${styles.page} ${styles.earningsPage}`} id={historyTab ? undefined : 'main-content'} aria-labelledby="earnings-title"
-          inert={!!historyTab || rulesOpen || withdrawPending || withdrawalResult !== null}>
+          inert={!!historyTab || rulesOpen || !!wechatDialog || withdrawPending || withdrawalResult !== null}>
           <header className={styles.earningsHeader}>
             <nav className={styles.earningsNav} aria-label="收益页导航">
               <button type="button" autoFocus ref={earningsBack} disabled={withdrawPending} onClick={onBackToLottery ?? closeEarnings} aria-label={onBackToLottery ? `返回${COIN_LOTTERY_NAME}` : '返回福利'}><ChevronLeft size={24} aria-hidden="true" /></button>
@@ -364,7 +390,23 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
           </header>
 
           <section className={styles.withdrawCard} aria-labelledby="withdraw-title">
-            <h2 id="withdraw-title"><span><Wallet size={18} aria-hidden="true" /></span>微信提现</h2>
+            <h2 id="withdraw-title">微信提现</h2>
+            <button className={styles.wechatBindingRow} type="button" ref={wechatTrigger} aria-haspopup="dialog"
+              aria-label={rewards.wechatBound ? '微信，已绑定，解绑' : '微信，未绑定，绑定微信'}
+              disabled={!rewards.canSimulateWithdrawal || withdrawPending}
+              onClick={() => {
+                setWechatError('');
+                setWechatDialog(rewards.wechatBound ? 'unbind' : 'bind');
+              }}>
+              <span className={styles.wechatIcon}>
+                <img src={`${import.meta.env.BASE_URL}images/welfare/wechat.svg`} alt="" width={22} height={22} />
+              </span>
+              <span className={styles.wechatName}>微信</span>
+              <span className={styles.wechatAction}>
+                {rewards.wechatBound ? '解绑' : '未绑定'}
+                <ChevronRight size={18} aria-hidden="true" />
+              </span>
+            </button>
             <p className={styles.sheetNote}>提现后1-3个工作日内到账</p>
             <div className={styles.withdrawTiers} role="group" aria-label="提现档位">
               {WITHDRAWAL_TIERS.map(value => (
@@ -395,6 +437,23 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
             <p className={styles.notice} role="status">{notice}</p>
           </section>
         </main>
+      )}
+
+      {wechatDialog && (
+        <Modal labelId={headingId} onClose={wechatPending ? undefined : closeWechatDialog}
+          className={`${styles.sheet} ${styles.withdrawalResult}`} backdropClassName={`${styles.backdrop} ${styles.withdrawalBackdrop}`}>
+          <h2 id={headingId}>{wechatDialog === 'bind' ? '绑定微信' : '解除微信绑定'}</h2>
+          <p className={styles.sheetNote}>{wechatDialog === 'bind'
+            ? '确认后即可体验微信提现流程。绑定状态仅保存在当前浏览器。'
+            : '解绑后，需重新绑定微信才能发起提现。'}</p>
+          {wechatError && <p className={styles.wechatError} role="alert">{wechatError}</p>}
+          <div className={styles.wechatDialogActions}>
+            <button className={styles.wechatCancel} type="button" disabled={wechatPending} onClick={closeWechatDialog}>取消</button>
+            <button className={styles.confirm} type="button" disabled={wechatPending} onClick={submitWechatBinding}>
+              {wechatPending ? '处理中…' : wechatDialog === 'bind' ? '确认绑定' : '确认解绑'}
+            </button>
+          </div>
+        </Modal>
       )}
 
       {withdrawalResult !== null && (
@@ -494,7 +553,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
             </li>
             <li>
               <strong>兑换与提现。</strong>{exchangeRate}，手动确认后计入现金余额。每次最低兑换 ¥0.01，不足一分钱的金币继续保留。
-              微信钱包提现可选 {WITHDRAWAL_TIERS.map(amount => `¥${amount}`).join('、')} 或自定义金额。
+              绑定微信后，可选择 {WITHDRAWAL_TIERS.map(amount => `¥${amount}`).join('、')} 或自定义金额申请提现。
               提现金额不得超过可提现余额，提交申请后 1–3 个工作日内到账。
             </li>
           </ol>

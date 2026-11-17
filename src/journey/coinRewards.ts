@@ -6,7 +6,7 @@ export const COINS_PER_YUAN = 10_000;
 export const COINS_PER_CENT = COINS_PER_YUAN / 100;
 // Transactions made before the price change retain their original amounts.
 const PREVIOUS_MEDAL_EXCHANGE_RATE = 1_000;
-const PREVIOUS_MEDAL_DRAW_COST = 5_000;
+const MEDAL_DRAW_LEDGER_COSTS = [MEDAL_LOTTERY_DRAW_COST, 1_000, 5_000];
 export const MILEAGE_REWARDS = [{ goal: 1, coins: 120 }, { goal: 2, coins: 100 }, { goal: 3, coins: 80 }] as const;
 export const ROUTE_REWARDS = [{ goal: 1, coins: 120 }, { goal: 2, coins: 100 }, { goal: 3, coins: 80 }] as const;
 export const DAILY_COIN_CAP = [...MILEAGE_REWARDS, ...ROUTE_REWARDS].reduce((total, tier) => total + tier.coins, 0);
@@ -247,7 +247,7 @@ export function readCoinLedger(raw: string | null): CoinLedger {
           ? (entry.track === 'mileage' || entry.track === 'route')
             && entry.id === starterClaimId(entry.track, entry.at) && entry.coins === STARTER_COIN_REWARDS[entry.track as CoinTrack].coins
         : entry.kind === 'demo-credit' ? entry.id === 'demo-credit' && entry.coins === COINS_PER_YUAN
-          : entry.kind === 'medal-draw' ? [MEDAL_LOTTERY_DRAW_COST, PREVIOUS_MEDAL_DRAW_COST].includes(entry.coins) && Number.isInteger(entry.prizeIndex)
+          : entry.kind === 'medal-draw' ? MEDAL_DRAW_LEDGER_COSTS.includes(entry.coins) && Number.isInteger(entry.prizeIndex)
             && entry.prizeIndex >= 0 && entry.prizeIndex < MEDAL_LOTTERY_PRIZES.length
           : entry.kind === 'medal-exchange' ? validMedals(entry.medals) && entry.medals.length > 0
             && [COINS_PER_LANDMARK_MEDAL, PREVIOUS_MEDAL_EXCHANGE_RATE].some(rate => entry.coins === entry.medals.length * rate)

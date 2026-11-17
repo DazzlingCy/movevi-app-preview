@@ -20,6 +20,11 @@ export function useCoinRewards(demo: boolean) {
   const canSimulateWithdrawal = transientPreview || demo;
   const previewMedals = transientPreview ? PREVIEW_AVAILABLE_MEDALS : [];
   const key = demo ? 'movevi-coins-demo-v1' : 'movevi-coins-v1';
+  const wechatBindingKey = `${key}:wechat-preview-bound`;
+  const readWechatBinding = () => {
+    if (!canSimulateWithdrawal) return false;
+    try { return localStorage.getItem(wechatBindingKey) === '1'; } catch { return false; }
+  };
   const read = () => readCoinLedger(localStorage.getItem(key));
   const [ledger, setLedger] = useState<CoinLedger>(() => {
     if (transientPreview) return createPreviewLedger();
@@ -27,10 +32,14 @@ export function useCoinRewards(demo: boolean) {
   });
   const latest = useRef(ledger);
   const [now, setNow] = useState(Date.now);
+  const [wechatBound, setWechatBound] = useState(readWechatBinding);
 
   useEffect(() => {
     const refreshDay = () => setNow(Date.now());
     const sync = (event: StorageEvent) => {
+      if (canSimulateWithdrawal && (event.key === wechatBindingKey || event.key === null)) {
+        setWechatBound(event.newValue === '1');
+      }
       if (transientPreview || event.key !== key) return;
       latest.current = readCoinLedger(event.newValue);
       setLedger(latest.current);
@@ -44,7 +53,7 @@ export function useCoinRewards(demo: boolean) {
       window.removeEventListener('focus', refreshDay);
       window.removeEventListener('storage', sync);
     };
-  }, [key, transientPreview]);
+  }, [key, transientPreview, canSimulateWithdrawal, wechatBindingKey]);
 
   const currentLedger = () => {
     if (transientPreview) return latest.current;
@@ -78,6 +87,7 @@ export function useCoinRewards(demo: boolean) {
     balance: coinBalance(ledger),
     cashCents: cashBalance(ledger),
     canSimulateWithdrawal,
+    wechatBound,
     today: coinDayProgress(ledger, now),
     starterClaims,
     availableMedals: getAvailableMedals(ledger, previewMedals),
@@ -142,8 +152,20 @@ export function useCoinRewards(demo: boolean) {
       return demo && withLedgerLock(() => update(previous => previous.some(entry => entry.kind === 'demo-credit' || entry.kind === 'demo-cash-credit')
         ? previous : [...previous, { kind: 'demo-cash-credit', id: 'demo-cash-credit', at: Date.now(), cents: 100 }]));
     },
+    async setWechatBinding(bound: boolean) {
+      if (!canSimulateWithdrawal) return false;
+      return withLedgerLock(() => {
+        try {
+          if (bound) localStorage.setItem(wechatBindingKey, '1');
+          else localStorage.removeItem(wechatBindingKey);
+        } catch { return false; }
+        setWechatBound(bound);
+        return true;
+      });
+    },
     async withdraw(amount: string | number, id: string) {
-      return canSimulateWithdrawal && withLedgerLock(() => update(previous => recordCashWithdrawal(previous, amount, id, Date.now())));
+      return canSimulateWithdrawal && withLedgerLock(() => readWechatBinding()
+        && update(previous => recordCashWithdrawal(previous, amount, id, Date.now())));
     },
   };
 }

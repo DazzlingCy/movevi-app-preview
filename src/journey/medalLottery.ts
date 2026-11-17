@@ -8,7 +8,7 @@ export interface LandmarkMedal {
 }
 
 export const COINS_PER_LANDMARK_MEDAL = 500;
-export const MEDAL_LOTTERY_DRAW_COST = 1_000;
+export const MEDAL_LOTTERY_DRAW_COST = 500;
 export const COIN_LOTTERY_NAME = '金币抽奖';
 
 export function getMedalLandmarks(route: Pick<JourneyRoute, 'landmarks' | 'medalLandmarks'>) {
