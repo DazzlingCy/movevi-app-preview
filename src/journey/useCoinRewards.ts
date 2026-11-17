@@ -13,12 +13,15 @@ function createPreviewLedger(): CoinLedger {
 export function useCoinRewards(demo: boolean) {
   // Vite preview serves a production build, including over the local network.
   const localPreview = __APP_VERSION__.startsWith('local-');
-  const hostedPreview = window.location.hostname === 'dazzlingcy.github.io'
-    && window.location.pathname.startsWith('/movevi-app-preview');
+  const { hostname, pathname } = window.location;
+  const githubPages = hostname === 'dazzlingcy.github.io';
+  const hostedPreview = githubPages && pathname.startsWith('/movevi-app-preview');
+  const publishedPreview = githubPages && /^\/movevi-app-2\.0(?:\/|$)/.test(pathname);
   const transientPreview = localPreview || hostedPreview;
-  const trackWorkouts = transientPreview || demo;
-  const canSimulateWithdrawal = transientPreview || demo;
-  const previewMedals = transientPreview ? PREVIEW_AVAILABLE_MEDALS : [];
+  const isPreview = transientPreview || publishedPreview;
+  const trackWorkouts = isPreview || demo;
+  const canSimulateWithdrawal = isPreview || demo;
+  const previewMedals = isPreview ? PREVIEW_AVAILABLE_MEDALS : [];
   const key = demo ? 'movevi-coins-demo-v1' : 'movevi-coins-v1';
   const wechatBindingKey = `${key}:wechat-preview-bound`;
   const readWechatBinding = () => {
@@ -33,6 +36,7 @@ export function useCoinRewards(demo: boolean) {
   const latest = useRef(ledger);
   const [now, setNow] = useState(Date.now);
   const [wechatBound, setWechatBound] = useState(readWechatBinding);
+  const [previewStarterClaims, setPreviewStarterClaims] = useState<Partial<Record<CoinTrack, string>>>({});
 
   useEffect(() => {
     const refreshDay = () => setNow(Date.now());
@@ -75,13 +79,18 @@ export function useCoinRewards(demo: boolean) {
     ? navigator.locks.request(key, mutate) : mutate();
 
   const day = exerciseDay(now);
-  const starterClaims = new Set(ledger.flatMap(entry =>
-    entry.kind === 'starter-claim' && exerciseDay(entry.at) === day ? [entry.track] : [],
-  ));
+  const starterClaims = new Set(publishedPreview
+    ? (['mileage', 'route'] as const).filter(track => previewStarterClaims[track] === day)
+    : ledger.flatMap(entry => entry.kind === 'starter-claim' && exerciseDay(entry.at) === day ? [entry.track] : []));
+  const exchangedMedals = getExchangedMedals(ledger).reverse();
+  if (publishedPreview) {
+    const exchangedIds = new Set(exchangedMedals.map(medal => medal.id));
+    exchangedMedals.push(...PREVIEW_EXCHANGED_MEDALS.filter(medal => !exchangedIds.has(medal.id)));
+  }
 
   return {
     demo,
-    transientPreview,
+    isPreview,
     trackWorkouts,
     ledger,
     balance: coinBalance(ledger),
@@ -90,8 +99,9 @@ export function useCoinRewards(demo: boolean) {
     wechatBound,
     today: coinDayProgress(ledger, now),
     starterClaims,
+    replayStarterClaims: publishedPreview,
     availableMedals: getAvailableMedals(ledger, previewMedals),
-    exchangedMedals: getExchangedMedals(ledger).reverse(),
+    exchangedMedals,
     medalDraws: getMedalDraws(ledger),
     async exchangeMedals(ids: readonly string[]) {
       const exchange = () => {
@@ -131,7 +141,23 @@ export function useCoinRewards(demo: boolean) {
       return withLedgerLock(draw);
     },
     async claimStarter(track: CoinTrack) {
-      return withLedgerLock(() => update(previous => recordStarterClaim(previous, track, Date.now())));
+      return withLedgerLock(() => {
+        const at = Date.now();
+        const claimDay = exerciseDay(at);
+        if (publishedPreview && previewStarterClaims[track] === claimDay) return null;
+        let alreadyAwarded = false;
+        const credited = update(previous => {
+          const next = recordStarterClaim(previous, track, at);
+          alreadyAwarded = next === previous;
+          return next;
+        });
+        if (!credited && !(publishedPreview && alreadyAwarded)) return null;
+        if (publishedPreview) {
+          setPreviewStarterClaims(previous => ({ ...previous, [track]: claimDay }));
+          if (!credited) setNow(at);
+        }
+        return { credited };
+      });
     },
     record(workout: CoinWorkout): ReturnType<typeof settleCoinWorkout> | undefined {
       if (!trackWorkouts) return;

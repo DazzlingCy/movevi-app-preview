@@ -33,7 +33,7 @@ const coinHistoryExamples = [
   { title: '金币兑换现金', delta: -1_000 },
 ];
 const cashHistoryExamples = [
-  { title: '幸运大转盘中奖', delta: 166, detail: '现金红包到账' },
+  { title: '幸运大转盘中奖', delta: 166 },
   { title: '金币兑换现金', delta: 80 },
   { title: '微信提现', delta: -20 },
   { title: '金币兑换现金', delta: 100 },
@@ -53,19 +53,23 @@ const fallingCoins = [
   { x: 94, drift: 10, delay: 170, size: 12, tilt: -38 },
 ];
 
-function RewardMilestones({ tiers, value, track, starterClaimed, onClaim }: {
+function RewardMilestones({ tiers, value, track, starterClaimed, replayStarter, onClaim }: {
   tiers: readonly { goal: number; coins: number }[];
   value: number;
   track: CoinTrack;
   starterClaimed: boolean;
+  replayStarter: boolean;
   onClaim: () => void;
 }) {
-  const current = tiers.findIndex((tier, index) => value < tier.goal && !(index === 0 && starterClaimed));
+  const reachedTier = (goal: number, index: number) => index === 0 && replayStarter
+    ? starterClaimed
+    : value >= goal || (index === 0 && starterClaimed);
+  const current = tiers.findIndex((tier, index) => !reachedTier(tier.goal, index));
   const isMileage = track === 'mileage';
   return (
     <ol className={`${styles.milestones} ${isMileage ? styles.mileageTimeline : styles.routeRewards}`}>
       {tiers.map((tier, index) => {
-        const reached = value >= tier.goal || (index === 0 && starterClaimed);
+        const reached = reachedTier(tier.goal, index);
         const claimable = index === 0 && !reached;
         const goal = track === 'route' ? `第 ${tier.goal} 条` : `${tier.goal} km`;
         const next = tiers[index + 1];
@@ -117,7 +121,7 @@ function RewardHistory({ ledger, showCash, showExamples }: { ledger: CoinEntry[]
       ...entry,
       id: `example-${index}`,
       date: entryDate.format(oldestDate - (index + 1) * 86_400_000),
-      detail: 'detail' in entry ? entry.detail : '',
+      detail: '',
     })),
   ];
   if (!rows.length) return <p className={styles.empty}>{showCash ? '暂无现金记录，兑换或提现后可在这里查看。' : '完成有效运动后，奖励明细会显示在这里。'}</p>;
@@ -154,7 +158,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
   const exchanging = useRef(false);
   const exchangeTrigger = useRef<HTMLButtonElement>(null);
   const [compact, setCompact] = useState(false);
-  const [claimedTrack, setClaimedTrack] = useState<CoinTrack | null>(null);
+  const [claimedReward, setClaimedReward] = useState<{ track: CoinTrack; credited: boolean } | null>(null);
   const [claimError, setClaimError] = useState('');
   const claiming = useRef(false);
   const tasksHeading = useRef<HTMLHeadingElement>(null);
@@ -225,8 +229,9 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
     claiming.current = true;
     setClaimError('');
     try {
-      if (await rewards.claimStarter(track)) {
-        setClaimedTrack(track);
+      const claim = await rewards.claimStarter(track);
+      if (claim) {
+        setClaimedReward({ track, credited: claim.credited });
         return;
       }
       setClaimError('暂时无法领取，请刷新后重试。');
@@ -237,7 +242,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
     }
   };
   const closeClaim = () => {
-    setClaimedTrack(null);
+    setClaimedReward(null);
     requestAnimationFrame(() => tasksHeading.current?.focus({ preventScroll: true }));
   };
   const openEarnings = () => {
@@ -321,7 +326,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
 
   return (
     <>
-      {!onBackToLottery && <main className={styles.page} id={earningsOpen || historyTab ? undefined : 'main-content'} aria-label="福利" inert={earningsOpen || !!historyTab || rulesOpen || !!claimedTrack || !!exchangeDraft}
+      {!onBackToLottery && <main className={styles.page} id={earningsOpen || historyTab ? undefined : 'main-content'} aria-label="福利" inert={earningsOpen || !!historyTab || rulesOpen || !!claimedReward || !!exchangeDraft}
         onScroll={event => setCompact(event.currentTarget.scrollTop >= (walletRef.current?.offsetHeight ?? Infinity))}>
         <div className={styles.stickyAnchor}>
           {compact && <div className={styles.stickyWallet}>
@@ -368,11 +373,11 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
             </header>
             <div className={styles.task}>
               <div className={styles.taskHeading}><span data-theme="sand"><Footprints size={18} aria-hidden="true" /></span><h3>累计运动里程</h3><strong>{(rewards.today.meters / 1000).toLocaleString('zh-CN', { maximumFractionDigits: 3 })} <small>km</small></strong></div>
-              <RewardMilestones tiers={MILEAGE_REWARDS} value={rewards.today.meters / 1000} track="mileage" starterClaimed={rewards.starterClaims.has('mileage')} onClaim={() => void claimStarter('mileage')} />
+              <RewardMilestones tiers={MILEAGE_REWARDS} value={rewards.today.meters / 1000} track="mileage" starterClaimed={rewards.starterClaims.has('mileage')} replayStarter={rewards.replayStarterClaims} onClaim={() => void claimStarter('mileage')} />
             </div>
             <div className={styles.task}>
               <div className={styles.taskHeading}><span data-theme="gold"><Route size={18} aria-hidden="true" /></span><h3>路线通关</h3><strong>{routeCount}<small> / {ROUTE_REWARDS.length} 条</small></strong></div>
-              <RewardMilestones tiers={ROUTE_REWARDS} value={routeCount} track="route" starterClaimed={rewards.starterClaims.has('route')} onClaim={() => void claimStarter('route')} />
+              <RewardMilestones tiers={ROUTE_REWARDS} value={routeCount} track="route" starterClaimed={rewards.starterClaims.has('route')} replayStarter={rewards.replayStarterClaims} onClaim={() => void claimStarter('route')} />
             </div>
             {claimError && <p className={styles.claimError} role="alert">{claimError}</p>}
           </section>
@@ -507,7 +512,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
                 <button key={tab} type="button" aria-pressed={historyTab === tab} onClick={() => setHistoryTab(tab)}>{historyTabs[tab]}</button>
               ))}
             </div>
-            <RewardHistory ledger={rewards.ledger} showCash={historyTab === 'cashHistory'} showExamples={rewards.transientPreview || rewards.demo} />
+            <RewardHistory ledger={rewards.ledger} showCash={historyTab === 'cashHistory'} showExamples={rewards.isPreview || rewards.demo} />
           </section>
         </main>
       )}
@@ -535,10 +540,10 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
         </Modal>
       )}
 
-      {claimedTrack && (
+      {claimedReward && (
         <Modal labelId={headingId} onClose={closeClaim} className={styles.claimDialog} backdropClassName={styles.claimBackdrop}>
-          <h2 id={headingId}>已获得 <strong>{STARTER_COIN_REWARDS[claimedTrack].coins}</strong> 金币</h2>
-          <p>{trackNames[claimedTrack]}奖励已入账</p>
+          <h2 id={headingId}>{claimedReward.credited ? '已获得' : '今日已获得'} <strong>{STARTER_COIN_REWARDS[claimedReward.track].coins}</strong> 金币</h2>
+          <p>{trackNames[claimedReward.track]}奖励已入账</p>
           <div className={styles.claimArt} aria-hidden="true">
             <img src={`${import.meta.env.BASE_URL}images/welfare/coin-purse-vermilion.webp`} alt="" width="544" height="363" />
             {fallingCoins.map(({ x, drift, delay, size, tilt }) => (
@@ -548,7 +553,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
               } as CSSProperties}>✦</span>
             ))}
           </div>
-          <button className={styles.claimDone} type="button" onClick={closeClaim}>收下金币</button>
+          <button className={styles.claimDone} type="button" onClick={closeClaim}>{claimedReward.credited ? '收下金币' : '知道了'}</button>
           <button className={styles.claimClose} type="button" onClick={closeClaim} aria-label="关闭领取结果"><X size={20} aria-hidden="true" /></button>
         </Modal>
       )}
