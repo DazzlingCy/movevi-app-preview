@@ -54,4 +54,3 @@ export function selectMedalLotteryPrize(stock: readonly number[], random = Math.
   }
   return -1;
 }
-

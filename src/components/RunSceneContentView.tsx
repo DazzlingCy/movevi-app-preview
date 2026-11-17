@@ -52,4 +52,3 @@ export default function RunSceneContentView({ scene, homeControls, routeIndex, o
     </main>
   );
 }
-
