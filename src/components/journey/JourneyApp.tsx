@@ -1696,6 +1696,7 @@ export default function JourneyApp() {
   const setNotice = (message: string, placement?: 'centered' | 'above-nav') => {
     setToastNotice(message ? { message, placement } : null);
   };
+  const showBenefitsToast = (message: string) => setNotice(message, 'above-nav');
   const [legacyFeature, setLegacyFeature] = useState<LegacyFeature | null>(puzzleDeepLink?'teamRelay':null);
   const [activityRoute, setActivityRoute] = useState<ActivityRouteTarget | null>(null);
   const [runningActivityRoute, setRunningActivityRoute] = useState<ActivityRouteTarget | null>(null);
@@ -2124,7 +2125,7 @@ export default function JourneyApp() {
               onBack={() => setLegacyFeature(null)}
               onGoRun={() => { setLegacyFeature(null); setActiveTab('home'); }}
               onDraw={drawMedalLottery}
-              renderEarnings={onBack => <EventsTab rewards={coinRewards} onBackToLottery={onBack} />}
+              renderEarnings={onBack => <EventsTab rewards={coinRewards} onToast={showBenefitsToast} onBackToLottery={onBack} />}
             />
           </motion.div>
         )
@@ -2178,7 +2179,7 @@ export default function JourneyApp() {
         )
         : routeSheetCity ? <motion.div className="screen-layer" key="legacy-route-list" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><CityRoutesView city={toLegacyCity(routeSheetCity, state)} cityCover={resolveCityCover(cityImageSource(routeSheetCity), 'cover')} routeItems={routeSheetCity.routes.map(route => toLegacyRouteItem(route, state))} completedRouteIndices={routeSheetCity.routes.filter(route => getCompletedRouteIds(state, routeSheetCity.id).includes(route.id)).map(route => route.order)} openRouteCount={getRouteListOpenCount(state, routeSheetCity.id)} onBack={closeCityRoutes} onRouteClick={openLegacyRoute} /></motion.div>
         : activeTab === 'profile' ? <motion.div className="screen-layer" key="profile" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><ProfilePage totals={totals} countryLevel={countryLevel} onDevice={() => setUtilityMode('device')} onLevel={() => openLegacyFeature('level')} onSettings={() => setUtilityMode('profile')} onFeature={label => setNotice(`${label} · 演示入口`)} /></motion.div>
-        : activeTab === 'activity' ? <motion.div className="screen-layer" key="activity" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><EventsTab rewards={coinRewards} onRun={() => selectPrimaryTab('home')} onToast={message => setNotice(message, 'above-nav')} onSelectMedalLottery={() => openLegacyFeature('medalLottery')} onSelectTeamRelay={() => openLegacyFeature('teamRelay')} onSelectHundredCities={() => openLegacyFeature('hundredCities')} /></motion.div>
+        : activeTab === 'activity' ? <motion.div className="screen-layer" key="activity" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><EventsTab rewards={coinRewards} onRun={() => selectPrimaryTab('home')} onToast={showBenefitsToast} onSelectMedalLottery={() => openLegacyFeature('medalLottery')} onSelectTeamRelay={() => openLegacyFeature('teamRelay')} onSelectHundredCities={() => openLegacyFeature('hundredCities')} /></motion.div>
         : activeTab === 'world' ? <motion.div className="screen-layer" key="world" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><MapPage state={state} totals={totals} onOpenCity={openCity} onCities={() => setCityListOpen(true)} onLeaderboard={() => openLegacyFeature('leaderboard')} onCountryLevel={() => openLegacyFeature('level')} /></motion.div>
         : <motion.div className="screen-layer" key="home" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
           <div className="screen-layer" inert={scenePickerOpen}>

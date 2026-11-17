@@ -81,7 +81,7 @@ export function useCoinRewards(demo: boolean) {
 
   return {
     demo,
-    localPreview,
+    transientPreview,
     trackWorkouts,
     ledger,
     balance: coinBalance(ledger),

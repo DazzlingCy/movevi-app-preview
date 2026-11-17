@@ -1,20 +1,19 @@
 import { useId, useRef, useState, type CSSProperties } from 'react';
 import { ArrowLeftRight, Check, ChevronLeft, ChevronRight, Coins, Footprints, Gift, Globe2, Route, Sparkle, Users, Wallet, X } from 'lucide-react';
 import { COINS_PER_CENT, COINS_PER_YUAN, DAILY_COIN_CAP, MILEAGE_REWARDS, ROUTE_REWARDS, STARTER_COIN_REWARDS, WITHDRAWAL_TIERS, cashChange, coinChange, formatCashValue, parseWithdrawalCents, quoteCashExchange, type CoinEntry, type CoinTrack, type WithdrawalTier } from '../journey/coinRewards';
-import { COIN_LOTTERY_NAME, COINS_PER_LANDMARK_MEDAL } from '../journey/medalLottery';
+import { COIN_LOTTERY_NAME, COINS_PER_LANDMARK_MEDAL, MEDAL_LOTTERY_DRAW_COST } from '../journey/medalLottery';
 import type { useCoinRewards } from '../journey/useCoinRewards';
 import Modal from './journey/Modal';
 import styles from './EventsTab.module.css';
 
 interface BenefitsActions {
   onRun: () => void;
-  onToast: (message: string) => void;
   onSelectMedalLottery: () => void;
   onSelectTeamRelay: () => void;
   onSelectHundredCities: () => void;
 }
 
-type EventsTabProps = { rewards: ReturnType<typeof useCoinRewards> } & (
+type EventsTabProps = { rewards: ReturnType<typeof useCoinRewards>; onToast: (message: string) => void } & (
   (BenefitsActions & { onBackToLottery?: never })
   | ({ onBackToLottery: () => void } & Partial<Record<keyof BenefitsActions, never>>)
 );
@@ -25,6 +24,21 @@ const entryDate = new Intl.DateTimeFormat('sv-SE', {
 });
 const trackNames = { mileage: '累计运动里程', route: '路线通关' };
 const historyTabs = { history: '金币记录', cashHistory: '现金记录' } as const;
+const previewHistoryRowCount = 5;
+const coinHistoryExamples = [
+  { title: `${trackNames.mileage}奖励`, delta: STARTER_COIN_REWARDS.mileage.coins },
+  { title: `${trackNames.route}奖励`, delta: STARTER_COIN_REWARDS.route.coins },
+  { title: '景点勋章兑换金币', delta: COINS_PER_LANDMARK_MEDAL },
+  { title: COIN_LOTTERY_NAME, delta: -MEDAL_LOTTERY_DRAW_COST },
+  { title: '金币兑换现金', delta: -1_000 },
+];
+const cashHistoryExamples = [
+  { title: '幸运大转盘中奖', delta: 166, detail: '现金红包到账' },
+  { title: '金币兑换现金', delta: 80 },
+  { title: '微信提现', delta: -20 },
+  { title: '金币兑换现金', delta: 100 },
+  { title: '微信提现', delta: -100 },
+];
 type HistoryTab = keyof typeof historyTabs;
 const exchangeRate = `${numberFormat.format(COINS_PER_YUAN)} 金币兑 ¥1`;
 type ExchangeDraft = ReturnType<typeof quoteCashExchange> & { id: string };
@@ -82,35 +96,41 @@ function RewardHistory({ ledger, showCash, showExamples }: { ledger: CoinEntry[]
   const change = showCash ? cashChange : coinChange;
   const entries = ledger.filter(entry => change(entry) !== 0)
     .sort((a, b) => b.at - a.at);
-  if (!entries.length && showExamples && !showCash) {
-    return (
-      <ul className={styles.history}>
-        {(['mileage', 'route'] as const).map((track, index) => (
-          <li key={track}>
-            <div><strong>{trackNames[track]}奖励</strong><small>{entryDate.format(Date.now() - index * 86_400_000)} · 示例记录</small></div>
-            <b>+{STARTER_COIN_REWARDS[track].coins} 金币</b>
-          </li>
-        ))}
-      </ul>
-    );
-  }
-  if (!entries.length) return <p className={styles.empty}>{showCash ? '暂无现金记录，兑换或提现后可在这里查看。' : '完成有效运动后，奖励明细会显示在这里。'}</p>;
+  const exampleRows = showExamples ? (showCash ? cashHistoryExamples : coinHistoryExamples) : [];
+  const exampleCount = Math.max(0, previewHistoryRowCount - entries.length);
+  const oldestDate = entries.at(-1)?.at ?? Date.now();
+  const rows = [
+    ...entries.map(entry => ({
+      id: `entry-${entry.id}`,
+      title: entry.kind === 'starter-claim' ? `${trackNames[entry.track]}奖励`
+        : entry.kind === 'exercise' ? entry.routeName
+        : entry.kind === 'medal-exchange' ? '景点勋章兑换金币'
+        : entry.kind === 'medal-draw' ? COIN_LOTTERY_NAME
+        : entry.kind === 'cash-exchange' ? '金币兑换现金'
+        : entry.kind === 'cash-withdrawal' ? '微信提现'
+        : entry.kind === 'withdrawal' ? '模拟提现' : '演示余额',
+      date: entryDate.format(entry.at),
+      detail: entry.kind === 'exercise' && !showCash ? `里程 +${entry.reward.mileage} · 通关 +${entry.reward.route}` : '',
+      delta: change(entry),
+    })),
+    ...exampleRows.slice(0, exampleCount).map((entry, index) => ({
+      ...entry,
+      id: `example-${index}`,
+      date: entryDate.format(oldestDate - (index + 1) * 86_400_000),
+      detail: 'detail' in entry ? entry.detail : '',
+    })),
+  ];
+  if (!rows.length) return <p className={styles.empty}>{showCash ? '暂无现金记录，兑换或提现后可在这里查看。' : '完成有效运动后，奖励明细会显示在这里。'}</p>;
   return (
     <ul className={styles.history}>
-      {entries.map(entry => {
-        const delta = change(entry);
+      {rows.map(({ id, title, date, detail, delta }) => {
         const amount = showCash ? formatCashValue(Math.abs(delta)) : `${numberFormat.format(Math.abs(delta))} 金币`;
         return (
-          <li key={entry.id}>
+          <li key={id}>
             <div>
-              <strong>{entry.kind === 'starter-claim' ? `${trackNames[entry.track]}奖励`
-                : entry.kind === 'exercise' ? entry.routeName
-                : entry.kind === 'medal-exchange' ? '景点勋章兑换金币'
-                : entry.kind === 'medal-draw' ? COIN_LOTTERY_NAME
-                : entry.kind === 'cash-exchange' ? '金币兑换现金'
-                : entry.kind === 'withdrawal' || entry.kind === 'cash-withdrawal' ? '模拟提现' : '演示余额'}</strong>
-              <small>{entryDate.format(entry.at)}</small>
-              {entry.kind === 'exercise' && !showCash && <small>里程 +{entry.reward.mileage} · 通关 +{entry.reward.route}</small>}
+              <strong>{title}</strong>
+              <small>{date}</small>
+              {detail && <small>{detail}</small>}
             </div>
             <b>{delta < 0 ? '−' : '+'}{amount}</b>
           </li>
@@ -187,7 +207,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
     setExchangeError('');
     try {
       if (await rewards.exchangeCash(exchangeDraft.coins, exchangeDraft.id)) {
-        onToast?.(`兑换成功，${formatCashValue(exchangeDraft.cents)} 已存入现金余额。`);
+        onToast(`兑换成功，${formatCashValue(exchangeDraft.cents)} 已存入现金余额。`);
         setExchangeDraft(null);
         requestAnimationFrame(() => exchangeTrigger.current?.focus({ preventScroll: true }));
       } else {
@@ -245,6 +265,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
     try {
       if (await rewards.setWechatBinding(wechatDialog === 'bind')) {
         closeWechatDialog();
+        onToast(wechatDialog === 'bind' ? '绑定成功' : '解绑成功');
         return;
       }
       setWechatError('绑定状态保存失败，请重试。');
@@ -381,7 +402,6 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
             <nav className={styles.earningsNav} aria-label="收益页导航">
               <button type="button" autoFocus ref={earningsBack} disabled={withdrawPending} onClick={onBackToLottery ?? closeEarnings} aria-label={onBackToLottery ? `返回${COIN_LOTTERY_NAME}` : '返回福利'}><ChevronLeft size={24} aria-hidden="true" /></button>
               <h1 id="earnings-title">我的收益</h1>
-              <button type="button" onClick={() => setRulesOpen(true)}>规则</button>
             </nav>
             <div className={`${styles.walletTop} ${styles.earningsBalance}`}>
               <button type="button" onClick={event => openHistory('history', event.currentTarget)}><span>金币收益 (金币)<ChevronRight size={14} aria-hidden="true" /></span><strong>{numberFormat.format(rewards.balance)}</strong></button>
@@ -444,7 +464,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
           className={`${styles.sheet} ${styles.withdrawalResult}`} backdropClassName={`${styles.backdrop} ${styles.withdrawalBackdrop}`}>
           <h2 id={headingId}>{wechatDialog === 'bind' ? '绑定微信' : '解除微信绑定'}</h2>
           <p className={styles.sheetNote}>{wechatDialog === 'bind'
-            ? '确认后即可体验微信提现流程。绑定状态仅保存在当前浏览器。'
+            ? '绑定后，可将现金余额提现至该微信账号。'
             : '解绑后，需重新绑定微信才能发起提现。'}</p>
           {wechatError && <p className={styles.wechatError} role="alert">{wechatError}</p>}
           <div className={styles.wechatDialogActions}>
@@ -474,7 +494,6 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
             <nav className={styles.earningsNav} aria-label="收益记录导航">
               <button type="button" autoFocus onClick={closeHistory} aria-label="返回"><ChevronLeft size={24} aria-hidden="true" /></button>
               <h1 id="history-title">收益记录</h1>
-              <button type="button" onClick={() => setRulesOpen(true)}>说明</button>
             </nav>
             <dl className={styles.historyBalance}>
               <div><dt>金币收益 (金币)</dt><dd>{numberFormat.format(rewards.balance)}</dd></div>
@@ -488,7 +507,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
                 <button key={tab} type="button" aria-pressed={historyTab === tab} onClick={() => setHistoryTab(tab)}>{historyTabs[tab]}</button>
               ))}
             </div>
-            <RewardHistory ledger={rewards.ledger} showCash={historyTab === 'cashHistory'} showExamples={rewards.localPreview || rewards.demo} />
+            <RewardHistory ledger={rewards.ledger} showCash={historyTab === 'cashHistory'} showExamples={rewards.transientPreview || rewards.demo} />
           </section>
         </main>
       )}

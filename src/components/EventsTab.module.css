@@ -247,20 +247,18 @@
   gap: 11px;
   margin-top: 12px;
   padding: 10px 14px;
-  border: 1px solid #24354a;
+  border: 1px solid var(--benefits-line);
   border-radius: 10px;
-  background: #18273b;
-  color: #f5f9ff;
+  background: var(--benefits-paper);
+  color: var(--benefits-ink);
   text-align: left;
 }
-.wechatBindingRow:not(:disabled):active { background: #22364e; }
-.wechatBindingRow:focus-visible { outline: 2px solid #17744c; outline-offset: 2px; }
+.wechatBindingRow:not(:disabled):active { background: var(--wallet-surface); }
 .wechatBindingRow:disabled { opacity: .7; }
-.wechatIcon { display: grid; width: 38px; height: 38px; flex: none; place-items: center; border-radius: 50%; background: #1bc328; }
+.wechatIcon { display: grid; width: 38px; height: 38px; flex: none; place-items: center; border-radius: 50%; background: #21834f; }
 .wechatIcon img { display: block; }
 .wechatName { flex: 1; font-size: 15px; font-weight: 700; }
-.wechatAction { display: flex; flex: none; align-items: center; gap: 7px; color: #e0e8f5; font-size: 14px; }
-.wechatAction svg { color: #b7c4d7; }
+.wechatAction { display: flex; flex: none; align-items: center; gap: 7px; color: var(--benefits-muted); font-size: 14px; }
 .wechatDialogActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .wechatCancel { min-height: 44px; border: 1px solid var(--benefits-line); border-radius: 10px; background: var(--benefits-paper); color: var(--benefits-ink); font-size: 14px; font-weight: 650; }
 .withdrawalResult .wechatError { margin: -10px 0 12px; color: #a1301b; font-size: 13px; }
