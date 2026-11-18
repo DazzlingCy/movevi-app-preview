@@ -369,7 +369,7 @@
 .withdrawTiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .withdrawTiers button { min-height: 66px; padding-inline: 1px; border: 1px solid var(--benefits-line); border-radius: 9px; background: var(--benefits-paper); }
 .withdrawTiers button[aria-pressed='true'] { border-color: var(--benefits-accent); background: var(--benefits-accent-soft); color: var(--benefits-accent); font-weight: 750; }
-.sheetNote, .notice, .empty, .rules { color: var(--benefits-muted); font-size: 13px; line-height: 1.6; }
+.sheetNote, .notice, .empty { color: var(--benefits-muted); font-size: 13px; line-height: 1.6; }
 .sheetNote { margin-block: 12px; }
 .confirm { width: 100%; min-height: 44px; font-size: 14px; }
 .confirm:disabled { background: #f2eae4; color: var(--benefits-muted); }
@@ -382,5 +382,15 @@
 .history li > div { display: grid; min-width: 0; gap: 3px; overflow-wrap: anywhere; }
 .history small { color: var(--benefits-muted); font-size: 11px; }
 .history b { color: #a6520c; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.rules { margin: 0; padding-inline-start: 22px; list-style: decimal; }
-.rules li + li { margin-top: 9px; }
+.rulesSheet:global(.modal-sheet) { display: flex; flex-direction: column; max-height: min(88%, 760px); overflow: hidden; padding: 12px 20px 0; color-scheme: light; }
+.rulesSheet:global(.modal-sheet)::before { flex: none; }
+.rulesSheet .sheetHeader { flex: none; margin: 0; padding-bottom: 12px; border-bottom: 1px solid var(--benefits-line); }
+.rulesSheet .sheetHeader button { width: 44px; height: 44px; flex: none; color: var(--benefits-ink); }
+.rules { min-height: 0; margin: 0; padding: 16px 0 max(20px, env(safe-area-inset-bottom, 0px)) 24px; overflow-y: auto; overscroll-behavior-y: contain; list-style: decimal; color: var(--benefits-muted); font-size: 13px; line-height: 1.7; scrollbar-width: thin; scrollbar-color: #d4bfb3 transparent; }
+.rules > li { padding-inline-start: 4px; }
+.rules > li::marker { color: var(--benefits-gold); font-size: 15px; font-weight: 700; }
+.rules > li + li { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--benefits-line); }
+.rules h3 { margin: 0 0 6px; color: var(--benefits-ink); font-size: 15px; font-weight: 750; line-height: 1.5; }
+.rules p { margin: 0; overflow-wrap: anywhere; }
+.rules p + p { margin-top: 6px; }
+.rules p strong { color: var(--benefits-ink); font-weight: 700; }
