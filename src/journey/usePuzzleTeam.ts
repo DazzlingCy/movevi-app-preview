@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { drawPuzzle, createPuzzle, finishPuzzle, joinPuzzle, PUZZLE_STORAGE, PUZZLE_DEMO_STORAGE, readPuzzle, type PuzzleCity, type PuzzlePiece, type PuzzleState, type RelayDraw } from './puzzleTeam';
+import { drawPuzzle, createPuzzle, finishPuzzle, joinPuzzle, choosePuzzleSharedRoute, periodParticipation, PUZZLE_STORAGE, PUZZLE_DEMO_STORAGE, readPuzzle, type PuzzleCity, type PuzzlePiece, type PuzzleState, type RelayDraw } from './puzzleTeam';
 import { weekendPeriod } from './weekendRelay';
 import { PUZZLE_DEMO_CLOCK, createPuzzlePreviewSession, finishPuzzleDemoPartner, joinPuzzleDemoPartner, puzzleDemoPeriodTime, seedPuzzleDemoLobby, unjoinedPuzzleWeekend } from './puzzleDemo';
 import type { PuzzleRoute } from './puzzleTeam';
@@ -63,6 +63,10 @@ export function usePuzzleTeam(demo=false,cities:PuzzleCity[]=[]) {
       return index<0?s:createPuzzle(s,city,crypto.randomUUID(),now(),{id:'host-'+index,name:names[index],avatarUrl:'https://i.pravatar.cc/100?img='+(11+index%3)});
     }),
     finish:(teamId:string,piece:PuzzlePiece)=>update(s=>finishPuzzle(s,teamId,piece,now())),
+    chooseRoute:(route:PuzzleRoute)=>{
+      const before=latest.current,team=periodParticipation(before,weekendPeriod(now()).id);
+      return !!team&&update(s=>choosePuzzleSharedRoute(s,team.id,route,now()))!==before;
+    },
     draw:(teamId:string):RelayDraw|undefined=>{
       const id=crypto.randomUUID(), random=crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
       const next=update(s=>drawPuzzle(s,teamId,'self',id,now(),random));

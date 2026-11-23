@@ -43,6 +43,10 @@
   padding: max(12px, env(safe-area-inset-top, 0px)) 14px 12px;
   background: linear-gradient(180deg, #090b1380, #090b1300);
 }
+.homeBar :global(.home-destination-actions) { min-width: 0; }
+.homeBar :global(.home-city-list-entry) { flex: none; }
+.homeBar :global(.home-run-mode-entry) { white-space: normal; }
+.homeBar :global(.home-run-mode-entry > span) { overflow-wrap: anywhere; line-height: 1.35; }
 .content {
   max-width: 550px;
   margin: 0 auto;

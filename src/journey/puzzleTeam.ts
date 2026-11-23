@@ -8,7 +8,7 @@ export interface PuzzlePiece {
 }
 export interface PuzzleTeam {
   id: string; city: PuzzleCity; createdAt: number; members: PuzzleMember[]; pieces: PuzzlePiece[];
-  period: WeekendPeriod; draws: RelayDraw[]; archived?: boolean;
+  period: WeekendPeriod; draws: RelayDraw[]; archived?: boolean; duoPieces?: PuzzlePiece[]; sharedRoute?: PuzzleRoute;
 }
 export interface RelayDraw { id: string; memberId: string; cents: number; createdAt: number }
 export interface PuzzleState { version: 4; teams: PuzzleTeam[] }
@@ -19,6 +19,48 @@ export const currentPuzzle = (state: PuzzleState) => state.teams.slice().reverse
 export const periodParticipation = (state: PuzzleState, periodId: string, memberId='self') => state.teams.find(t=>t.period.id===periodId && t.members.some(m=>m.id===memberId));
 export const puzzleComplete = (team: PuzzleTeam) => team.pieces.length === 3 && (team.archived || team.members.length === 2) && new Set(team.pieces.map(p => p.memberId)).size >= 2;
 export const ownPieces = (team: PuzzleTeam, memberId = 'self') => team.pieces.filter(p => p.memberId === memberId);
+export const puzzleAllPieces = (team: PuzzleTeam) => [...team.pieces, ...(team.duoPieces ?? [])];
+const sameRoute = (a: PuzzleRoute, b: Pick<PuzzleRoute, 'id' | 'routeId'>) => a.id === b.id && a.routeId === b.routeId;
+
+/** The extra shared run does not consume a relay slot or award another draw. */
+export function sharedPuzzleRoute(team: PuzzleTeam): PuzzleRoute | undefined {
+  if (team.archived || team.members.length !== 2 || new Set(team.members.map(member => member.id)).size !== 2) return;
+  const pieces = puzzleAllPieces(team);
+  return pieces.find(piece => (!team.sharedRoute || sameRoute(piece.route,team.sharedRoute)) && team.members.every(member => pieces.some(other =>
+    other.memberId === member.id && sameRoute(other.route, piece.route)
+    && other.route.id === team.city.id && Number.isFinite(other.distanceKm) && Number.isFinite(other.route.distanceKm)
+    && other.route.distanceKm > 0 && other.distanceKm >= other.route.distanceKm && other.route.distanceKm === piece.route.distanceKm
+    && other.startedAt >= Math.max(...team.members.map(item => item.joinedAt)) && other.finishedAt >= other.startedAt
+    && periodOpen(team.period, other.startedAt) && periodOpen(team.period, other.finishedAt)
+  )))?.route;
+}
+
+export function canRunPuzzleRoute(team: PuzzleTeam, route: Pick<PuzzleRoute, 'id' | 'routeId'>, now: number, memberId = 'self') {
+  if (team.archived || team.members.length !== 2 || !periodOpen(team.period, now) || route.id !== team.city.id
+    || !team.members.some(member => member.id === memberId)
+    || puzzleAllPieces(team).some(piece => piece.memberId === memberId && sameRoute(piece.route, route))) return false;
+  const partnerFinished = team.pieces.some(piece => piece.memberId !== memberId && sameRoute(piece.route, route));
+  if (partnerFinished) return (!team.sharedRoute || sameRoute(team.sharedRoute,route)) && !sharedPuzzleRoute(team) && !team.duoPieces?.length;
+  return !puzzleComplete(team) && ownPieces(team, memberId).length < 2;
+}
+
+export function canChooseSharedRoute(team: PuzzleTeam, now: number) {
+  return !team.archived && periodOpen(team.period,now) && team.members.some(member=>member.id==='self')
+    && team.members.length <= 2 && puzzleAllPieces(team).length === 0;
+}
+
+export function choosePuzzleSharedRoute(state: PuzzleState, teamId: string, route: PuzzleRoute, now: number): PuzzleState {
+  const team=state.teams.find(item=>item.id===teamId);
+  if(!team||!canChooseSharedRoute(team,now)||route.id!==team.city.id||!validSharedRoute(route)
+    ||team.sharedRoute?.routeId===route.routeId)return state;
+  return {...state,teams:state.teams.map(item=>item.id===teamId?{...item,sharedRoute:{...route}}:item)};
+}
+
+function validSharedRoute(route: PuzzleRoute) {
+  return typeof route.routeId==='string'&&!!route.routeId&&typeof route.name==='string'&&typeof route.image==='string'
+    &&typeof route.title==='string'&&!!route.title&&Number.isInteger(route.routeIndex)&&route.routeIndex>0
+    &&Number.isFinite(route.distanceKm)&&route.distanceKm>0&&Number.isFinite(route.minutes)&&route.minutes>0;
+}
 export function openPuzzleTeams(state:PuzzleState,now:number):PuzzleTeam[] {
   const period=weekendPeriod(now);
   return state.teams.filter(t=>!t.archived&&t.period.id===period.id&&periodOpen(t.period,now)&&t.members.length===1&&!t.members.some(m=>m.id==='self')&&!puzzleComplete(t));
@@ -45,14 +87,16 @@ export function joinPuzzle(state: PuzzleState, teamId: string, member: PuzzleMem
 }
 export function finishPuzzle(state: PuzzleState, teamId: string, piece: PuzzlePiece, receivedAt = piece.finishedAt): PuzzleState {
   const team=state.teams.find(t=>t.id===teamId);
-  if(!team||team.archived||team.members.length!==2||piece.route.id!==team.city.id||!periodOpen(team.period,receivedAt)||!periodOpen(team.period,piece.startedAt)||!periodOpen(team.period,piece.finishedAt)
-    ||piece.startedAt<Math.max(...team.members.map(m=>m.joinedAt))||piece.finishedAt>receivedAt||puzzleComplete(team)||!piece.id||!piece.route.routeId
+  if(!team||!canRunPuzzleRoute(team,piece.route,receivedAt,piece.memberId)||!periodOpen(team.period,piece.startedAt)||!periodOpen(team.period,piece.finishedAt)
+    ||piece.startedAt<Math.max(...team.members.map(m=>m.joinedAt))||piece.finishedAt>receivedAt||!piece.id||!piece.route.routeId
     ||![piece.startedAt,piece.finishedAt,piece.distanceKm,piece.route.distanceKm].every(Number.isFinite)
     ||piece.finishedAt<piece.startedAt||piece.route.distanceKm<=0||piece.distanceKm<piece.route.distanceKm
-    ||!Number.isInteger(piece.slot)||piece.slot<0||piece.slot>2
-    ||!team.members.some(m=>m.id===piece.memberId)||ownPieces(team,piece.memberId).length>=2
-    ||state.teams.some(t=>t.pieces.some(p=>p.id===piece.id))
-    ||team.pieces.some(p=>p.route.id===piece.route.id&&p.route.routeId===piece.route.routeId))return state;
+    ||!Number.isInteger(piece.slot)||piece.slot<0||piece.slot>3
+    ||state.teams.some(t=>puzzleAllPieces(t).some(p=>p.id===piece.id)))return state;
+  if (team.pieces.some(p => sameRoute(p.route, piece.route))) {
+    if (team.pieces.some(p => sameRoute(p.route, piece.route) && p.route.distanceKm !== piece.route.distanceKm)) return state;
+    return {...state, teams: state.teams.map(t => t.id === teamId ? {...t, duoPieces: [{...piece, slot: 0}]} : t)};
+  }
   return {...state,teams:state.teams.map(t=>t.id===teamId?{...t,pieces:[...t.pieces,{...piece,slot:t.pieces.length}]}:t)};
 }
 export function drawsLeft(team:PuzzleTeam,memberId='self'):number {
@@ -74,11 +118,20 @@ export function readPuzzle(storage?:Pick<Storage,'getItem'>, key=PUZZLE_STORAGE)
     if(state?.version===4&&Array.isArray(state.teams)&&state.teams.every((t:PuzzleTeam)=>
       typeof t.id==='string'&&typeof t.city?.name==='string'&&typeof t.city.id==='string'&&typeof t.city.image==='string'
       &&Number.isFinite(t.createdAt)&&Array.isArray(t.members)&&t.members.length<=4
+      &&(t.sharedRoute===undefined||(t.sharedRoute&&t.sharedRoute.id===t.city.id&&validSharedRoute(t.sharedRoute)))
       &&t.members.every(m=>typeof m.id==='string'&&typeof m.name==='string'&&Number.isFinite(m.joinedAt))
       &&Array.isArray(t.pieces)&&t.pieces.length<=3&&new Set(t.pieces.map(p=>p.slot)).size===t.pieces.length
       &&t.pieces.every(p=>typeof p.id==='string'&&typeof p.memberId==='string'&&Number.isInteger(p.slot)&&p.slot>=0&&p.slot<=2
         &&typeof p.route?.title==='string'&&typeof p.route.name==='string'&&typeof p.route.routeId==='string'
         &&Number.isFinite(p.finishedAt)&&Number.isFinite(p.startedAt)&&Number.isFinite(p.distanceKm))
+      &&(t.duoPieces===undefined||(Array.isArray(t.duoPieces)&&t.duoPieces.length<=1&&t.duoPieces.every(p=>
+        typeof p.id==='string'&&!!p.id&&typeof p.memberId==='string'&&p.slot===0
+        &&typeof p.route?.title==='string'&&typeof p.route.routeId==='string'&&p.route.id===t.city.id
+        &&Number.isFinite(p.route.distanceKm)&&p.route.distanceKm>0&&Number.isFinite(p.distanceKm)&&p.distanceKm>=p.route.distanceKm
+        &&Number.isFinite(p.startedAt)&&Number.isFinite(p.finishedAt)&&p.finishedAt>=p.startedAt
+        &&p.startedAt>=Math.max(...t.members.map(m=>m.joinedAt))&&periodOpen(t.period,p.startedAt)&&periodOpen(t.period,p.finishedAt)
+        &&t.members.some(m=>m.id===p.memberId)&&t.pieces.some(other=>other.memberId!==p.memberId&&sameRoute(other.route,p.route))
+        &&!t.pieces.some(other=>other.id===p.id||other.memberId===p.memberId&&sameRoute(other.route,p.route)))))
       &&typeof t.period?.id==='string'&&Number.isFinite(t.period.startsAt)&&Number.isFinite(t.period.endsAt)
       &&Array.isArray(t.draws)&&t.draws.every(d=>typeof d.id==='string'&&typeof d.memberId==='string'&&Number.isFinite(d.createdAt)&&WEEKEND_PRIZES.some(p=>p.cents===d.cents))))
       return {...state,teams:state.teams.map((t:PuzzleTeam)=>t.members.length>2?{...t,archived:true}:t)};

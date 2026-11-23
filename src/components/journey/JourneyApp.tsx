@@ -46,10 +46,11 @@ import { useCoinRewards } from '../../journey/useCoinRewards';
 import { getDailyRouteRecommendations, type DailyRouteRecommendation } from '../../journey/routeRecommendations';
 import DailyRouteRecommendationsView from '../DailyRouteRecommendationsView';
 import RunSceneView from '../RunSceneView';
-import { runSceneImage, type RunScene, type SceneContent } from '../../journey/runScenes';
+import { runSceneImage, type RunSceneMode, type SceneContent } from '../../journey/runScenes';
+import { chooseRunScenePreview, type RunSceneChoice } from '../../journey/runSceneTags';
 import RunSceneContentView from '../RunSceneContentView';
 import homeRunStyles from './HomeRunElements.module.css';
-import { periodParticipation, ownPieces, puzzleComplete, type PuzzleRoute } from '../../journey/puzzleTeam';
+import { periodParticipation, puzzleComplete, puzzleAllPieces, canRunPuzzleRoute, sharedPuzzleRoute, type PuzzleRoute } from '../../journey/puzzleTeam';
 import FirstCityRewardsView from '../FirstCityRewardsView';
 import WeekendMedleyView from '../WeekendMedleyView';
 import Modal from './Modal';
@@ -1675,11 +1676,12 @@ export default function JourneyApp() {
   const [routeCityId, setRouteCityId] = useState<string | null>(null);
   const [routeSuggestionSource, setRouteSuggestionSource] = useState<'daily' | null>(null);
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
-  const [selectedScene, setSelectedScene] = useState<RunScene | null>(null);
+  const [selectedScene, setSelectedScene] = useState<RunSceneMode | null>(null);
   const [sceneRoute, setSceneRoute] = useState<{ entry: SceneContent; route: JourneyRoute } | null>(null);
   const recommendationsOpen = routeSuggestionSource === 'daily';
   const recommendationScrollTop = useRef(0);
   const sceneRouteIndex = useRef(0);
+  const lastPreviewLead = useRef<string | undefined>(undefined);
   const recommendationDay = exerciseDay();
   const recommendations = getDailyRouteRecommendations(recommendationDay);
   const [newCityIds, setNewCityIds] = useState(() => PUBLISHED_CITY_IDS.slice(-1));
@@ -1800,8 +1802,19 @@ export default function JourneyApp() {
   };
   const openRunScenes = () => setScenePickerOpen(true);
   const closeRunScenes = () => setScenePickerOpen(false);
-  const selectRunScene = (scene: RunScene | null) => {
-    if (scene !== selectedScene) sceneRouteIndex.current = 0;
+  const selectRunScene = (choice: RunSceneChoice | null) => {
+    let scene: RunSceneMode | null = null;
+    if (choice) {
+      if ('entries' in choice) {
+        scene = choice;
+      } else {
+        scene = chooseRunScenePreview(choice, lastPreviewLead.current);
+        if (scene) lastPreviewLead.current = scene.entries[0].image;
+      }
+    }
+    if (scene?.id !== selectedScene?.id || scene?.entries[0].image !== selectedScene?.entries[0].image) {
+      sceneRouteIndex.current = 0;
+    }
     setSelectedScene(scene);
     closeRunScenes();
   };
@@ -1957,7 +1970,6 @@ export default function JourneyApp() {
   const openLegacyFeature = (feature: LegacyFeature) => {
     firstCityReturnRef.current = false;
     firstCityPreviewTaskRef.current = null;
-    if(feature==='teamRelay'&&puzzleDemo)puzzle.restartPreview();
     setLegacyFeature(feature);
     setRouteCityId(null);
     setSelectedRouteId(null);
@@ -1974,8 +1986,7 @@ export default function JourneyApp() {
   const openTeamRelayRoute = (route: PuzzleRoute, preview = false) => {
     const team = periodParticipation(puzzle.state,weekendPeriod(puzzle.now()).id);
     const available = puzzleRoutes.find(r => r.id === route.id && r.routeId === route.routeId);
-    if (!team || team.archived || team.members.length !== 2 || !periodOpen(team.period,puzzle.now()) || !available || available.id !== team.city.id || puzzleComplete(team) || ownPieces(team).length >= 2
-      || team.pieces.some(p => p.route.id === route.id && p.route.routeId === route.routeId)) { setNotice('路线状态已更新，请返回活动页重新选择。'); return; }
+    if (!team || !available || !canRunPuzzleRoute(team,available,puzzle.now())) { setNotice('路线状态已更新，请返回活动页重新选择。'); return; }
     const slot = team.pieces.length;
     const target: ActivityRouteTarget = {source:'teamRelay',cityId:available.id,routeIndex:available.routeIndex,image:available.image,taskId:String(slot)};
     dispatch({ type:'REVEAL_ROUTE',cityId:available.id,routeId:available.routeId });
@@ -2011,12 +2022,12 @@ export default function JourneyApp() {
     const record = puzzleSession.current; puzzleSession.current = null;
     if (record && stats) {
       const next = puzzle.finish(record.teamId, {...record, memberId:'self', finishedAt:puzzle.now(), distanceKm:stats.distance});
-      const earned = next.teams.some(t => t.pieces.some(p => p.id === record.id));
+      const earned = next.teams.some(t => puzzleAllPieces(t).some(p => p.id === record.id));
       if(earned) {
         firstCityRewards.completeRoute(record.route.id, record.route.routeId);
         dispatch({type:'COMPLETE_ROUTE',cityId:record.route.id,routeId:record.route.routeId,background:true,result:{distanceKm:stats.distance,durationSeconds:stats.duration,calories:stats.calories}});
       }
-      if(!puzzleDemo||!earned)setNotice(earned ? (puzzleComplete(next.teams.find(t => t.id === record.teamId)!) ? '小队已完成 3 条路线，可以去抽奖了' : '路线已完成，小队进度已更新') : '本次未计入，请完整跑完路线；每人每期最多 2 条');
+      if(!puzzleDemo||!earned)setNotice(earned ? (sharedPuzzleRoute(next.teams.find(t => t.id === record.teamId)!) ? '同路挑战已完成，可领取额外金币' : puzzleComplete(next.teams.find(t => t.id === record.teamId)!) ? '小队已完成 3 条路线，可以去抽奖了' : '路线已完成，小队进度已更新') : '本次未计入，请完整跑完路线，并检查活动时间和路线状态');
     }
     setLegacyFeature('teamRelay');
   };
@@ -2088,7 +2099,7 @@ export default function JourneyApp() {
         : activityRoute ? <motion.div className="screen-layer" key="activity-route-detail" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><RouteDetailView cityId={activityRoute.cityId} routeIndex={activityRoute.routeIndex} image={activityRoute.image} routeOverride={activityRoute.source === 'teamRelay' ? toLegacyRouteItem(getJourneyCity(activityRoute.cityId)!.routes[activityRoute.routeIndex-1],state) : undefined} onBack={() => setActivityRoute(null)} onStart={() => {
           if (activityRoute.source === 'teamRelay') {
             const team = periodParticipation(puzzle.state,weekendPeriod(puzzle.now()).id); const route = puzzleRoutes.find(r => r.id === activityRoute.cityId && r.routeIndex === activityRoute.routeIndex);
-            if (!team || team.archived || team.members.length !== 2 || !periodOpen(team.period,puzzle.now()) || !route || route.id !== team.city.id || puzzleComplete(team) || ownPieces(team).length >= 2 || team.pieces.some(p => p.route.id === route.id && p.route.routeId === route.routeId)) { setNotice('路线状态已更新，请返回活动页重新选择。'); return; }
+            if (!team || !route || !canRunPuzzleRoute(team,route,puzzle.now())) { setNotice('路线状态已更新，请返回活动页重新选择。'); return; }
             puzzleSession.current = {id:crypto.randomUUID(),teamId:team.id,startedAt:puzzle.now(),slot:Number(activityRoute.taskId),route};
             dispatch({ type:'REVEAL_ROUTE',cityId:route.id,routeId:route.routeId });
           }
@@ -2121,7 +2132,7 @@ export default function JourneyApp() {
           </motion.div>
         )
         : legacyFeature === 'weekendMedley' ? <motion.div className="screen-layer" key="weekend-medley" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><WeekendMedleyView onBack={() => setLegacyFeature(null)} selectedRouteIds={medleySelectedRouteIds} completedRouteIds={medleyCompletedRouteIds} lotteryChances={medleyLotteryChances} drawHistory={medleyDrawHistory} shareBonusClaimed={medleyShareBonusClaimed} activityStarted={medleyActivityStarted} onUpdateState={(next) => { if (next.selectedRouteIds !== undefined) setMedleySelectedRouteIds(next.selectedRouteIds); if (next.completedRouteIds !== undefined) setMedleyCompletedRouteIds(next.completedRouteIds); if (next.lotteryChances !== undefined) setMedleyLotteryChances(next.lotteryChances); if (next.drawHistory !== undefined) setMedleyDrawHistory(next.drawHistory); if (next.shareBonusClaimed !== undefined) setMedleyShareBonusClaimed(next.shareBonusClaimed); if (next.activityStarted !== undefined) setMedleyActivityStarted(next.activityStarted); }} onNavigateToRouteDetail={openMedleyRoute} /></motion.div>
-        : legacyFeature === 'teamRelay' ? <motion.div className="screen-layer" key="team-relay" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><TeamRelayView preview={puzzleDemo} state={puzzle.state} cities={puzzleCities} routes={puzzleRoutes} storageFailed={puzzle.storageFailed} onBack={() => setLegacyFeature(null)} onCreate={puzzle.create} onJoin={puzzle.join} onDraw={puzzle.draw} now={puzzle.now()} onRun={openTeamRelayRoute} onSimulatePartner={puzzleDemo?puzzle.demoFinishPartner:undefined} onSimulateJoin={puzzleDemo?puzzle.demoJoin:undefined} /></motion.div>
+        : legacyFeature === 'teamRelay' ? <motion.div className="screen-layer" key="team-relay" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><TeamRelayView preview={puzzleDemo} state={puzzle.state} cities={puzzleCities} routes={puzzleRoutes} storageFailed={puzzle.storageFailed} onBack={() => setLegacyFeature(null)} onCreate={puzzle.create} onJoin={puzzle.join} onDraw={puzzle.draw} now={puzzle.now()} onRun={openTeamRelayRoute} onChooseSharedRoute={puzzle.chooseRoute} onSimulatePartner={puzzleDemo?puzzle.demoFinishPartner:undefined} onSimulateJoin={puzzleDemo?puzzle.demoJoin:undefined} coinBalance={coinRewards.balance} claimedCoinPeriods={coinRewards.claimedTeamPeriods} onClaimCoins={team => coinRewards.claimTeamRouteReward(team,puzzle.now())} onGoCoins={() => { setLegacyFeature(null); selectPrimaryTab('activity'); }} /></motion.div>
         : legacyFeature === 'firstCityRewards' ? <motion.div className="screen-layer" key="first-city-rewards" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><FirstCityRewardsView state={firstCityRewards.state} city={{ name:rewardCity.name, image:cityImageFor(rewardCity), total:rewardCity.routes.length }} storageFailed={firstCityRewards.storageFailed} onBack={() => setLegacyFeature(null)} onDevice={openFirstCityActivation} onContinue={continueFirstCityTask} onClaim={firstCityRewards.claim} /></motion.div>
         : runningRoute && runningRouteData ? (
           <motion.div className="screen-layer" key="running" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -2175,7 +2186,7 @@ export default function JourneyApp() {
         : <motion.div className="screen-layer" key="home" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
           <div className="screen-layer" inert={scenePickerOpen}>
             {selectedScene ? (
-              <Fragment key={selectedScene.id}>
+              <Fragment key={`${selectedScene.id}:${selectedScene.entries[0].image}`}>
                 <RunSceneContentView
                   scene={selectedScene}
                   homeControls={<>
@@ -2198,7 +2209,7 @@ export default function JourneyApp() {
           <AnimatePresence>
             {scenePickerOpen && (
               <motion.div className="screen-layer run-scene-layer" key="run-scenes" initial={{ x: reduceMotion ? 0 : '-100%' }} animate={{ x: 0, pointerEvents: 'auto' }} exit={{ x: reduceMotion ? 0 : '-100%', pointerEvents: 'none' }} transition={{ duration: reduceMotion ? 0 : .28, ease: [0.22, 0.7, 0.2, 1] }}>
-                <RunSceneView selection={selectedScene} onSelect={selectRunScene} onUnavailable={() => setNotice('暂未开放，敬请期待', 'centered')} onClose={closeRunScenes} />
+                <RunSceneView selection={selectedScene} cityAccent={homeCity.accent} onSelect={selectRunScene} onClose={closeRunScenes} />
               </motion.div>
             )}
           </AnimatePresence>

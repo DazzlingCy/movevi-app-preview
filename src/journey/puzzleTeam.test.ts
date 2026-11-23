@@ -68,9 +68,12 @@ test('duplicate records/routes, partial runs, outsiders and late completions can
  assert.equal(finishPuzzle(s,'team',piece('late-submit'),BASE+3*86400000),s);
  s=finishPuzzle(s,'team',piece('a'));assert.equal(finishPuzzle(s,'team',piece('a')),s);assert.equal(finishPuzzle(s,'team',piece('dup-route','self','a')),s);
 });
-test('different members cannot credit the same route; concurrent finishes are checked against latest team state',()=>{
+test('a shared route earns a separate completion without another relay stamp or draw',()=>{
  let s=pair();s=finishPuzzle(s,'team',piece('a'));
- assert.equal(finishPuzzle(s,'team',piece('friend-a','partner','a')),s);
+ s=finishPuzzle(s,'team',piece('friend-a','partner','a'));
+ assert.equal(s.teams[0].pieces.length,1);
+ assert.equal(s.teams[0].duoPieces?.length,1);
+ assert.equal(ownPieces(s.teams[0],'partner').length,0);
  s=finishPuzzle(s,'team',piece('friend-c','partner','c'));
  assert.equal(finishPuzzle(s,'team',piece('self-c','self','c')),s);
  s=finishPuzzle(s,'team',piece('b'));

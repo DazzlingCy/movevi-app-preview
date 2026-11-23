@@ -86,7 +86,9 @@ test('instant preview completions preserve route deduplication, personal quota a
   state=finish('second','self',routes[1]);
   assert.equal(finish('over-quota','self',routes[2]),state);
   assert.equal(drawsLeft(currentPuzzle(state)!),0);
-  assert.equal(finish('partner-repeat','peer',routes[0]),state);
+  state=finish('partner-repeat','peer',routes[0]);
+  assert.equal(currentPuzzle(state)!.duoPieces?.length,1);
+  assert.equal(currentPuzzle(state)!.pieces.length,2);
   state=finish('third','peer',routes[2]);
   const restored=readPuzzle({getItem:()=>JSON.stringify(state)}),team=currentPuzzle(restored)!;
   assert.equal(puzzleComplete(team),true);

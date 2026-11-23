@@ -1,6 +1,7 @@
 import { exerciseDay } from './dailyExercise';
 import { getJourneyRoute } from './data';
 import { COINS_PER_LANDMARK_MEDAL, getMedalLotteryStock, getRunMedals, MEDAL_LOTTERY_DRAW_COST, MEDAL_LOTTERY_PRIZES, selectMedalLotteryPrize, type LandmarkMedal } from './medalLottery';
+import { puzzleAllPieces, sharedPuzzleRoute, type PuzzleTeam } from './puzzleTeam';
 
 export const COINS_PER_YUAN = 10_000;
 export const COINS_PER_CENT = COINS_PER_YUAN / 100;
@@ -12,6 +13,7 @@ export const ROUTE_REWARDS = [{ goal: 1, coins: 120 }, { goal: 2, coins: 100 }, 
 export const DAILY_COIN_CAP = [...MILEAGE_REWARDS, ...ROUTE_REWARDS].reduce((total, tier) => total + tier.coins, 0);
 export const WITHDRAWAL_TIERS = [1, 3, 5] as const;
 export const MAX_WITHDRAWAL_CENTS = 20_000;
+export const TEAM_SHARED_ROUTE_COINS = 500;
 export type WithdrawalTier = typeof WITHDRAWAL_TIERS[number];
 export type CoinTrack = 'mileage' | 'route';
 export const STARTER_COIN_REWARDS = { mileage: MILEAGE_REWARDS[0], route: ROUTE_REWARDS[0] } as const;
@@ -46,8 +48,19 @@ type CashEntry = { kind: 'cash-withdrawal' | 'demo-cash-credit'; id: string; at:
 type StarterClaimEntry = { kind: 'starter-claim'; id: string; at: number; track: CoinTrack; coins: number };
 export type MedalExchangeEntry = { kind: 'medal-exchange'; id: string; at: number; coins: number; medals: readonly LandmarkMedal[] };
 export type MedalDrawEntry = { kind: 'medal-draw'; id: string; at: number; coins: number; prizeIndex: number };
-export type CoinEntry = ExerciseEntry | BalanceEntry | CashExchangeEntry | CashEntry | StarterClaimEntry | MedalExchangeEntry | MedalDrawEntry;
+export type TeamRouteRewardEntry = { kind: 'team-route-reward'; id: string; at: number; coins: number; teamId: string; periodId: string; routeKey: string; routeName: string };
+export type CoinEntry = ExerciseEntry | BalanceEntry | CashExchangeEntry | CashEntry | StarterClaimEntry | MedalExchangeEntry | MedalDrawEntry | TeamRouteRewardEntry;
 export type CoinLedger = CoinEntry[];
+
+export function recordTeamRouteReward(ledger: CoinLedger, team: PuzzleTeam, at: number): CoinLedger {
+  const route = sharedPuzzleRoute(team);
+  const id = `team-route-reward:${team.period.id}:self`;
+  if (!route || !validTimestamp(at) || !team.members.some(member => member.id === 'self')
+    || ledger.some(entry => entry.id === id || entry.kind === 'team-route-reward' && entry.periodId === team.period.id)
+    || puzzleAllPieces(team).some(piece => piece.route.id === route.id && piece.route.routeId === route.routeId && piece.finishedAt > at)) return ledger;
+  return [...ledger, {kind: 'team-route-reward', id, at, coins: TEAM_SHARED_ROUTE_COINS, teamId: team.id,
+    periodId: team.period.id, routeKey: `${route.id}:${route.routeId}`, routeName: `${route.name} · ${route.title}`}];
+}
 
 export const formatCashValue = (cents: number) => `¥${(cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -248,6 +261,10 @@ export function readCoinLedger(raw: string | null): CoinLedger {
         : entry.kind === 'starter-claim'
           ? (entry.track === 'mileage' || entry.track === 'route')
             && entry.id === starterClaimId(entry.track, entry.at) && entry.coins === STARTER_COIN_REWARDS[entry.track as CoinTrack].coins
+        : entry.kind === 'team-route-reward' ? typeof entry.teamId === 'string' && !!entry.teamId
+            && typeof entry.periodId === 'string' && !!entry.periodId && entry.id === `team-route-reward:${entry.periodId}:self`
+            && typeof entry.routeKey === 'string' && !!entry.routeKey && typeof entry.routeName === 'string' && !!entry.routeName
+            && entry.coins === TEAM_SHARED_ROUTE_COINS
         : entry.kind === 'demo-credit' ? entry.id === 'demo-credit' && entry.coins === COINS_PER_YUAN
           : entry.kind === 'medal-draw' ? MEDAL_DRAW_LEDGER_COSTS.includes(entry.coins) && Number.isInteger(entry.prizeIndex)
             && entry.prizeIndex >= 0 && entry.prizeIndex < MEDAL_LOTTERY_PRIZES.length

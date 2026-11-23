@@ -109,12 +109,14 @@ function RewardHistory({ ledger, showCash, showExamples }: { ledger: CoinEntry[]
       title: entry.kind === 'starter-claim' ? `${trackNames[entry.track]}奖励`
         : entry.kind === 'exercise' ? entry.routeName
         : entry.kind === 'medal-exchange' ? '景点勋章兑换金币'
+        : entry.kind === 'team-route-reward' ? '搭子小队同路奖励'
         : entry.kind === 'medal-draw' ? COIN_LOTTERY_NAME
         : entry.kind === 'cash-exchange' ? '金币兑换现金'
         : entry.kind === 'cash-withdrawal' ? '微信提现'
         : entry.kind === 'withdrawal' ? '模拟提现' : '演示余额',
       date: entryDate.format(entry.at),
-      detail: entry.kind === 'exercise' && !showCash ? `里程 +${entry.reward.mileage} · 路线完成 +${entry.reward.route}` : '',
+      detail: entry.kind === 'exercise' && !showCash ? `里程 +${entry.reward.mileage} · 路线完成 +${entry.reward.route}`
+        : entry.kind === 'team-route-reward' ? entry.routeName : '',
       delta: change(entry),
     })),
     ...exampleRows.slice(0, exampleCount).map((entry, index) => ({
@@ -179,7 +181,7 @@ export default function EventsTab({ rewards, onRun, onToast, onSelectMedalLotter
   const activities = [
     { name: COIN_LOTTERY_NAME, description: '勋章兑金币，金币抽现金红包', icon: Gift, theme: 'gold', select: onSelectMedalLottery },
     { name: '百人百城计划', description: '打卡全球城市，圆梦旅行大奖', icon: Globe2, theme: 'red', select: onSelectHundredCities },
-    { name: '环球搭子小队', description: '双人组队，完成城市路线', icon: Users, theme: 'sand', select: onSelectTeamRelay, hidden: true },
+    { name: '环球搭子小队', description: '双人组队，同路完成额外赚金币', icon: Users, theme: 'sand', select: onSelectTeamRelay, hidden: false },
   ].filter(activity => !activity.hidden);
   const routeCount = Math.min(rewards.today.routes.size, ROUTE_REWARDS.length);
   const amount = tier === 'custom' ? customAmount : tier;

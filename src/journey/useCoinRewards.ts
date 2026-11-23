@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { exerciseDay } from './dailyExercise';
-import { cashBalance, coinBalance, coinDayProgress, getAvailableMedals, getExchangedMedals, getMedalDraws, readCoinLedger, recordCashExchange, recordCashWithdrawal, recordMedalDraw, recordMedalExchange, recordStarterClaim, settleCoinWorkout, type CoinLedger, type CoinTrack, type CoinWorkout } from './coinRewards';
+import { cashBalance, coinBalance, coinDayProgress, getAvailableMedals, getExchangedMedals, getMedalDraws, readCoinLedger, recordCashExchange, recordCashWithdrawal, recordMedalDraw, recordMedalExchange, recordStarterClaim, recordTeamRouteReward, settleCoinWorkout, TEAM_SHARED_ROUTE_COINS, type CoinLedger, type CoinTrack, type CoinWorkout } from './coinRewards';
+import type { PuzzleTeam } from './puzzleTeam';
 import { MEDAL_LOTTERY_DRAW_COST, MEDAL_LOTTERY_POOL_SIZE, PREVIEW_AVAILABLE_MEDALS, PREVIEW_EXCHANGED_MEDALS } from './medalLottery';
 
 declare const __APP_VERSION__: string;
@@ -103,6 +104,10 @@ export function useCoinRewards(demo: boolean) {
     availableMedals: getAvailableMedals(ledger, previewMedals),
     exchangedMedals,
     medalDraws: getMedalDraws(ledger),
+    claimedTeamPeriods: new Set<string>(ledger.flatMap(entry => entry.kind === 'team-route-reward' ? [entry.periodId] : [])),
+    async claimTeamRouteReward(team: PuzzleTeam, at: number) {
+      return withLedgerLock(() => update(previous => recordTeamRouteReward(previous, team, at)) ? TEAM_SHARED_ROUTE_COINS : 0);
+    },
     async exchangeMedals(ids: readonly string[]) {
       const exchange = () => {
         const selected = new Set(ids);

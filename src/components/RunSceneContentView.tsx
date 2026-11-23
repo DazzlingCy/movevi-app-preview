@@ -1,11 +1,11 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
-import { getSceneContentRoute, runSceneImage, type RunScene, type SceneContent } from '../journey/runScenes';
+import { getSceneContentRoute, runSceneImage, type RunSceneMode, type SceneContent } from '../journey/runScenes';
 import type { JourneyRoute } from '../journey/types';
 import RouteCardRail from './RouteCardRail';
 import styles from './DailyRouteRecommendationsView.module.css';
 
 interface Props {
-  scene: RunScene;
+  scene: RunSceneMode;
   homeControls: ReactNode;
   routeIndex: number;
   onRouteIndexChange: (index: number) => void;
@@ -26,7 +26,7 @@ export default function RunSceneContentView({ scene, homeControls, routeIndex, o
           <img className={styles.image} src={runSceneImage(entry)} alt="" width="550" height="960" decoding="async"
             loading={active ? 'eager' : 'lazy'} fetchPriority={active ? 'high' : 'low'} />
         </span>
-        <span className={styles.routeType + ' ' + styles.sceneType}>{scene.label}</span>
+        <span className={styles.routeType + ' ' + styles.sceneType}>{scene.cardLabel ?? scene.label}</span>
         <span className={styles.routeBody}>
           <strong>{entry.title}</strong>
           <span className={styles.landmarks}>{route.name.replace(/\s*·\s*/, ' · ')}</span>
