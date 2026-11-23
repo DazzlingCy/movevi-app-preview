@@ -265,9 +265,19 @@ type ActivityRouteTarget = {
 };
 
 function HomeRunModeButton({ modeName, onClick }: { modeName?: string; onClick: () => void }) {
+  const label = modeName ?? '跑步模式';
+  const characters = Array.from(label.replace(/\s/g, ''));
+  const scrolls = characters.length > 4;
   return (
     <button className="home-run-mode-entry" type="button" data-mode-selected={modeName ? true : undefined} aria-label={modeName ? `跑步模式：${modeName}，切换模式` : '跑步模式'} aria-haspopup="dialog" title={modeName ? `切换跑步模式（${modeName}）` : '跑步模式'} onClick={onClick}>
-      <SlidersHorizontal aria-hidden="true" /><span>{modeName ?? '跑步模式'}</span>
+      <SlidersHorizontal aria-hidden="true" />
+      <span className="home-run-mode-label" data-scroll={scrolls || undefined} aria-hidden="true">
+        {scrolls ? (
+          <span className="home-run-mode-label__track">
+            {characters.map((character, index) => <span key={index}>{character}</span>)}
+          </span>
+        ) : label}
+      </span>
     </button>
   );
 }

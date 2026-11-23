@@ -51,6 +51,7 @@ svg { stroke-width: 1.8; }
 .phone-shell {
   --bottom-nav-height: 72px;
   --bottom-nav-inset: max(10px, env(safe-area-inset-bottom));
+  --home-toolbar-top-padding: max(24px, calc(env(safe-area-inset-top, 0px) + 12px));
   position: relative;
   isolation: isolate;
   width: min(100%, 430px);
@@ -1022,14 +1023,33 @@ body { background: var(--bg); }
 }
 .home-run-mode-entry svg { width:16px; height:16px; flex-shrink:0; color:var(--run-mode-accent); }
 .home-run-mode-entry:focus-visible { outline: 2px solid var(--run-mode-accent); outline-offset: 2px; }
+.home-run-mode-label { display: block; max-inline-size: 4em; overflow: hidden; white-space: nowrap; }
+.home-run-mode-label[data-scroll] { flex: none; inline-size: 4em; }
+.home-run-mode-label__track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1em;
+  inline-size: max-content;
+  animation: home-run-mode-scroll 3.4s ease-in-out infinite alternate;
+}
+@keyframes home-run-mode-scroll {
+  0%, 25% { transform: translateX(0); }
+  75%, 100% { transform: translateX(calc(4em - 100%)); }
+}
+.home-run-mode-entry:focus-visible .home-run-mode-label__track { animation-play-state: paused; }
+[data-reduced-motion='true'] .home-run-mode-label__track { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .home-run-mode-label__track { animation: none; }
+}
 .city-new-badge { position:absolute; padding:1px 5px; border:1px solid #1d1929; border-radius:6px; background:#ffce9c; color:#332018; font-size:9px; font-weight:750; line-height:12px; letter-spacing:.03em; pointer-events:none; }
 .home-city-list-entry__new { top:-5px; right:-7px; }
 .page--home:has(.destination-carousel.is-browsing) .home-destination-actions { opacity:0; visibility:hidden; }
 .page--home:has(.destination-carousel.is-browsing) .home-destination-actions > button { pointer-events:none; }
-@media (max-width:380px) { .home-run-mode-entry:not([data-mode-selected]) span { display:none; } }
+@media (max-width:380px) { .home-run-mode-entry:not([data-mode-selected]) .home-run-mode-label { display:none; } }
 @media(hover:hover) {
   .home-city-list-entry:hover { background:rgba(13,25,34,.84); }
   .home-run-mode-entry:hover { background: color-mix(in srgb, var(--run-mode-accent) 12%, var(--journey-surface)); border-color: var(--run-mode-accent); }
+  .home-run-mode-entry:hover .home-run-mode-label__track { animation-play-state: paused; }
 }
 @media(prefers-reduced-motion:reduce) { .home-destination-actions { transition:none; } }
 .home-quick-actions { pointer-events: auto; flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
@@ -1847,6 +1867,17 @@ body { background: var(--bg); }
 
 .legacy-profile-card { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #0f1014; }
 .legacy-profile-card__identity { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 20px 18px 17px; }
+@media (max-width: 539px) {
+  .page--home { grid-template-rows: auto minmax(0, 1fr); }
+  .home-commandbar {
+    position: sticky;
+    inset: 0 0 auto;
+    padding-block-start: var(--home-toolbar-top-padding);
+    background: var(--paper);
+  }
+  .page--home:not(:has(.destination-carousel.is-browsing)) .destination-journey-card.is-active :is(.destination-upcoming-card__status,.destination-card__new) { top: 14px; }
+}
+
 @media (max-width: 360px) {
   .legacy-profile-card__identity { gap: 8px; padding-inline: 12px; }
   .legacy-profile-card__identity .legacy-avatar { width: 48px; height: 48px; border-radius: 16px; }

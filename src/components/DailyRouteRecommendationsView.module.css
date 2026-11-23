@@ -26,6 +26,7 @@
   --route-rail-focus: var(--recommendation-accent);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   padding-bottom: calc(64px + max(10px, env(safe-area-inset-bottom, 0px)));
   background-image:
     radial-gradient(ellipse at 6% 13%, #090b13c2, transparent 62%),
@@ -33,20 +34,15 @@
       color-mix(in srgb, var(--scene-background-glow) 30%, transparent), transparent 60%);
 }
 .homeBar {
-  position: sticky;
-  z-index: 1;
-  top: 0;
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: max(12px, env(safe-area-inset-top, 0px)) 14px 12px;
-  background: linear-gradient(180deg, #090b1380, #090b1300);
 }
 .homeBar :global(.home-destination-actions) { min-width: 0; }
 .homeBar :global(.home-city-list-entry) { flex: none; }
-.homeBar :global(.home-run-mode-entry) { white-space: normal; }
-.homeBar :global(.home-run-mode-entry > span) { overflow-wrap: anywhere; line-height: 1.35; }
 .content {
   max-width: 550px;
   margin: 0 auto;
@@ -62,7 +58,21 @@
 }
 .listHeader time { color: var(--recommendation-muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .listHeader h1 { margin: 0; font-size: clamp(28px, 8.6vw, 34px); font-weight: 800; line-height: 1.15; }
-.sceneHome .content { display: flex; flex: 1 0 auto; flex-direction: column; width: 100%; padding-bottom: 0; }
+.sceneHome .content {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  padding-bottom: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+}
+
+@media (max-width: 539px) {
+  .homeBar { padding-block-start: var(--home-toolbar-top-padding); }
+}
 
 @media (max-width: 380px) {
   .homeBar :global(.home-city-list-entry) { min-width: 38px; padding-inline: 8px; }
@@ -195,7 +205,7 @@
   flex-direction: column;
   justify-content: center;
   margin-inline: calc(-1 * var(--recommendation-gutter) + 8px);
-  padding-block: 12px;
+  padding-block: 0 24px;
 }
 .sceneRail > div { flex: 0 0 auto; }
 .sceneRail .route {
