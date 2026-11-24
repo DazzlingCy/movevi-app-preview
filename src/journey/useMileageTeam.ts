@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { matchesMileageTarget, type MileageCommand, type MileageRunRoute, type MileageSnapshot } from './mileageTeams';
+import { createLocalMileageService } from './localMileageTeams';
+import { MileageError } from '../server/mileageTeamsStore';
 
 class RequestError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -25,25 +27,49 @@ export function useMileageTeam(visible: boolean) {
   const outbox = useRef(readOutbox());
   const flushing = useRef(false);
   const refreshing = useRef(false);
+  const localService = useRef<ReturnType<typeof createLocalMileageService>>();
+  const usingLocalPreview = useRef(false);
 
   const request = useCallback(async (command?: MileageCommand) => {
     const version = ++sequence.current;
-    const response = await fetch(new URL('api/mileage-teams', window.location.href), {
-      credentials: 'same-origin', cache: 'no-store',
-      ...(command && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) }),
-    });
-    if (!response.headers.get('Content-Type')?.includes('application/json')) {
-      throw new RequestError('小队服务未连接，请使用本地预览', 503);
+    const localRequest = () => {
+      localService.current ??= createLocalMileageService(window.localStorage);
+      try { return localService.current.request(command); }
+      catch (e) {
+        if (e instanceof MileageError) throw new RequestError(e.message, e.status);
+        throw e;
+      }
+    };
+    let body: MileageSnapshot;
+    if (usingLocalPreview.current) body = localRequest();
+    else {
+      let response: Response | undefined;
+      try {
+        response = await fetch(new URL('api/mileage-teams', window.location.href), {
+          credentials: 'same-origin', cache: 'no-store',
+          ...(command && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) }),
+        });
+      } catch (e) {
+        if (!import.meta.env.PROD) throw e;
+        usingLocalPreview.current = true;
+      }
+      if (!response || !response.headers.get('Content-Type')?.includes('application/json')) {
+        if (!import.meta.env.PROD) throw new RequestError('小队服务未连接，请使用本地预览', 503);
+        usingLocalPreview.current = true;
+        body = localRequest();
+      } else {
+        const payload = await response.json();
+        if (!response.ok) throw new RequestError(payload.message ?? '小队服务暂不可用', response.status);
+        body = payload as MileageSnapshot;
+      }
     }
-    const body = await response.json();
-    if (!response.ok) throw new RequestError(body.message ?? '小队服务暂不可用', response.status);
     try { localStorage.setItem(sessionKey, '1'); } catch { /* The session cookie remains available. */ }
     if (version >= applied.current) {
       applied.current = version;
-      setSnapshot(body as MileageSnapshot);
+      setSnapshot(body);
       setError('');
     }
-    return body as MileageSnapshot;
+    return body;
   }, []);
 
   const report = (e: unknown) => e instanceof RequestError ? e.message : '无法连接小队服务，请稍后重试';

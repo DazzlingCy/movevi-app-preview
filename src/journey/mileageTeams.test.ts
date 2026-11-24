@@ -8,6 +8,7 @@ import test from 'node:test';
 import { createMileageMiddleware } from '../server/mileageTeamsPlugin';
 import { applyMileageCommand, emptyMileageDatabase, mileageSnapshot } from '../server/mileageTeamsStore';
 import { coinBalance, importMileageGrants, readCoinLedger } from './coinRewards';
+import { createLocalMileageService } from './localMileageTeams';
 import { mileageMemberShortfall, MILEAGE_TEAM_TIERS, type MileageCommand, type MileageRunRoute } from './mileageTeams';
 
 const now = Date.parse('2026-11-24T14:00:00+08:00');
@@ -218,6 +219,26 @@ test('the five preview offers can be joined independently and run with their nam
   assert.notEqual(otherTeam.members[0].id, mileageSnapshot(data, 'runner-0').current?.members[0].id);
   assert.deepEqual(otherTeam.members.map(person => person.meters), [0, 0]);
   assert.throws(() => applyMileageCommand(data, 'viewer', { action:'join', teamId:previewLobby[1].id }, now), /已有一支小队/);
+});
+
+test('the browser preview service persists a team and identity without an API server', () => {
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value); },
+  };
+  const first = createLocalMileageService(storage);
+  const initial = first.request();
+  assert.equal(initial.previewLobby.length, 5);
+  first.request({ action:'create', target:forest, goalMeters:2000 });
+  const created = first.request().current!;
+  first.request({ action:'simulatePartner', teamId:created.id });
+
+  const restored = createLocalMileageService(storage).request();
+  assert.equal(restored.self, initial.self);
+  assert.equal(restored.current?.id, created.id);
+  assert.equal(restored.current?.status, 'active');
+  assert.deepEqual(restored.current?.members.map(item => item.meters), [0, 0]);
 });
 
 test('HTTP lobby accepts one of two simultaneous joins and restores the team from disk',async()=>{

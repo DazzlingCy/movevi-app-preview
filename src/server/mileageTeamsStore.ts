@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import {
   isMileageGoalMet, isPreviewMileageMember, matchesMileageTarget, mileageTeamPlan, MILEAGE_MEMBER_GOAL,
   MILEAGE_METERS_PER_SECOND, MILEAGE_TEAM_TIERS, MILEAGE_PREVIEW_PARTNER,
@@ -16,6 +15,7 @@ export class MileageError extends Error {
   constructor(message: string, public status = 409) { super(message); }
 }
 
+const randomId = () => globalThis.crypto.randomUUID();
 const label = (user: string) => `跑友 ${user.slice(0, 4).toUpperCase()}`;
 const member = (id: string) => ({ id, name: label(id), meters: 0 });
 const includes = (team: MileageTeam, user: string) => team.members.some(item => item.id === user);
@@ -58,7 +58,7 @@ export function mileageSnapshot(data: MileageDatabase, user: string): MileageSna
 function newTeam(data: MileageDatabase, target: MileageTeam['target'], plan: MileageTeamPlan, members: MemberIdentity[], now: number) {
   const joined = members.length === 2;
   const team: TeamRecord = {
-    id: randomUUID(), target, plan,
+    id: randomId(), target, plan,
     members: members.map(({ id, name, avatarUrl }) => ({ id, name, avatarUrl, meters: 0 })),
     status: joined ? 'active' : 'waiting',
     createdAt: now, ...(joined ? { startedAt: now } : {}),
@@ -86,7 +86,7 @@ export function applyMileageCommand(data: MileageDatabase, user: string, command
       const current = openTeam(data, user);
       if (current?.previewOfferId === offer.id) return;
       if (current) throw new MileageError('你已有一支小队');
-      const captain = { id: `preview-${randomUUID()}`, ...offer.captain };
+      const captain = { id: `preview-${randomId()}`, ...offer.captain };
       newTeam(data, offer.target, offer.plan, [captain, member(user)], now).previewOfferId = offer.id;
       return;
     }
