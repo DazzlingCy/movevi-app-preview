@@ -1,7 +1,9 @@
 import { exerciseDay } from './dailyExercise';
 import { getJourneyRoute } from './data';
 import { COINS_PER_LANDMARK_MEDAL, getMedalLotteryStock, getRunMedals, MEDAL_LOTTERY_DRAW_COST, MEDAL_LOTTERY_PRIZES, selectMedalLotteryPrize, type LandmarkMedal } from './medalLottery';
-import { puzzleAllPieces, sharedPuzzleRoute, type PuzzleTeam } from './puzzleTeam';
+import { duoGoalComplete, puzzleAllPieces, sharedPuzzleRoute, type PuzzleTeam } from './puzzleTeam';
+import { availableCityRelayRewards, cityRelayRewardId, CITY_RELAY_COINS, isCityRelayId, type CityRelayAttempt, type CityRelayReward } from './cityRelay';
+import { isMileageTeamReward, LEGACY_MILEAGE_TEAM_PLAN, mileageGrantId, type MileageGrant } from './mileageTeams';
 
 export const COINS_PER_YUAN = 10_000;
 export const COINS_PER_CENT = COINS_PER_YUAN / 100;
@@ -14,6 +16,7 @@ export const DAILY_COIN_CAP = [...MILEAGE_REWARDS, ...ROUTE_REWARDS].reduce((tot
 export const WITHDRAWAL_TIERS = [1, 3, 5] as const;
 export const MAX_WITHDRAWAL_CENTS = 20_000;
 export const TEAM_SHARED_ROUTE_COINS = 500;
+export const TEAM_DUO_COINS = TEAM_SHARED_ROUTE_COINS * 2;
 export type WithdrawalTier = typeof WITHDRAWAL_TIERS[number];
 export type CoinTrack = 'mileage' | 'route';
 export const STARTER_COIN_REWARDS = { mileage: MILEAGE_REWARDS[0], route: ROUTE_REWARDS[0] } as const;
@@ -23,6 +26,7 @@ export interface CoinExerciseEvidence {
   activeSeconds: number;
   endedAt: number;
   source?: 'playback';
+  teamMeters?: number;
 }
 
 export interface CoinWorkout extends CoinExerciseEvidence {
@@ -48,18 +52,69 @@ type CashEntry = { kind: 'cash-withdrawal' | 'demo-cash-credit'; id: string; at:
 type StarterClaimEntry = { kind: 'starter-claim'; id: string; at: number; track: CoinTrack; coins: number };
 export type MedalExchangeEntry = { kind: 'medal-exchange'; id: string; at: number; coins: number; medals: readonly LandmarkMedal[] };
 export type MedalDrawEntry = { kind: 'medal-draw'; id: string; at: number; coins: number; prizeIndex: number };
-export type TeamRouteRewardEntry = { kind: 'team-route-reward'; id: string; at: number; coins: number; teamId: string; periodId: string; routeKey: string; routeName: string };
-export type CoinEntry = ExerciseEntry | BalanceEntry | CashExchangeEntry | CashEntry | StarterClaimEntry | MedalExchangeEntry | MedalDrawEntry | TeamRouteRewardEntry;
+export type TeamRouteRewardEntry = { kind: 'team-route-reward'; id: string; at: number; coins: number; teamId: string; periodId: string; routeKey: string; routeName: string; mode?: 'duo' };
+type CityRelayRewardEntry = {
+  kind: 'city-relay-reward'; id: string; at: number; coins: number; routeName: string; reward: CityRelayReward;
+  teamId?: string; periodId?: string;
+};
+type MileageTeamEntry = { kind: 'mileage-team-reward'; id: string; at: number; coins: number; teamId: string; targetName: string };
+export type CoinEntry = ExerciseEntry | BalanceEntry | CashExchangeEntry | CashEntry | StarterClaimEntry | MedalExchangeEntry | MedalDrawEntry | TeamRouteRewardEntry | CityRelayRewardEntry | MileageTeamEntry;
 export type CoinLedger = CoinEntry[];
 
-export function recordTeamRouteReward(ledger: CoinLedger, team: PuzzleTeam, at: number): CoinLedger {
+export function getTeamCoinReward(team: PuzzleTeam) {
+  if (team.mode === 'duo') {
+    if (!duoGoalComplete(team)) return;
+    const route = team.sharedRoute;
+    return {
+      coins: TEAM_DUO_COINS,
+      routeKey: route ? `${route.id}:${route.routeId}` : team.city.id,
+      routeName: route ? `${route.name} · ${route.title}` : `${team.city.name}场景`,
+      finishedAt: Math.max(...team.pieces.map(piece => piece.finishedAt)),
+    };
+  }
   const route = sharedPuzzleRoute(team);
+  if (!route) return;
+  return {
+    coins: TEAM_SHARED_ROUTE_COINS,
+    routeKey: `${route.id}:${route.routeId}`,
+    routeName: `${route.name} · ${route.title}`,
+    finishedAt: Math.max(...puzzleAllPieces(team).filter(piece => piece.route.id === route.id && piece.route.routeId === route.routeId)
+      .map(piece => piece.finishedAt)),
+  };
+}
+
+export function recordTeamRouteReward(ledger: CoinLedger, team: PuzzleTeam, at: number, memberId = 'self'): CoinLedger {
+  const reward = getTeamCoinReward(team);
   const id = `team-route-reward:${team.period.id}:self`;
-  if (!route || !validTimestamp(at) || !team.members.some(member => member.id === 'self')
+  if (!reward || !validTimestamp(at) || !team.members.some(member => member.id === memberId)
     || ledger.some(entry => entry.id === id || entry.kind === 'team-route-reward' && entry.periodId === team.period.id)
-    || puzzleAllPieces(team).some(piece => piece.route.id === route.id && piece.route.routeId === route.routeId && piece.finishedAt > at)) return ledger;
-  return [...ledger, {kind: 'team-route-reward', id, at, coins: TEAM_SHARED_ROUTE_COINS, teamId: team.id,
-    periodId: team.period.id, routeKey: `${route.id}:${route.routeId}`, routeName: `${route.name} · ${route.title}`}];
+    || reward.finishedAt > at) return ledger;
+  return [...ledger, {kind: 'team-route-reward', id, at, coins: reward.coins, teamId: team.id,
+    periodId: team.period.id, routeKey: reward.routeKey, routeName: reward.routeName, ...(team.mode ? {mode: team.mode} : {})}];
+}
+
+export function recordCityRelayReward(ledger: CoinLedger, attempt: CityRelayAttempt, at: number): CoinLedger {
+  if (!validTimestamp(at) || !isCityRelayId(attempt.id) || !attempt.route) return ledger;
+  const routeName = attempt.route.name;
+  const reference = attempt.teamSize === 4 ? { periodId: attempt.id } : { teamId: attempt.id };
+  const rewards = availableCityRelayRewards(attempt, at, new Set(ledger.map(entry => entry.id)));
+  if (!rewards.length) return ledger;
+  return [...ledger, ...rewards.map((reward): CityRelayRewardEntry => ({
+    kind: 'city-relay-reward', id: cityRelayRewardId(attempt.id, reward), at,
+    coins: CITY_RELAY_COINS[reward], ...reference, routeName, reward,
+  }))];
+}
+
+export function importMileageGrants(ledger: CoinLedger, grants: readonly MileageGrant[]): CoinLedger {
+  const known = new Set(ledger.map(entry => entry.id));
+  const entries = grants.flatMap((grant): MileageTeamEntry[] => {
+    const id = mileageGrantId(grant.teamId);
+    const coins = grant.coins ?? LEGACY_MILEAGE_TEAM_PLAN.rewardCoins;
+    if (known.has(id) || !isCityRelayId(grant.teamId) || !validTimestamp(grant.at) || !grant.targetName || !isMileageTeamReward(coins)) return [];
+    known.add(id);
+    return [{ ...grant, id, kind: 'mileage-team-reward', coins }];
+  });
+  return entries.length ? [...ledger, ...entries] : ledger;
 }
 
 export const formatCashValue = (cents: number) => `¥${(cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -264,7 +319,14 @@ export function readCoinLedger(raw: string | null): CoinLedger {
         : entry.kind === 'team-route-reward' ? typeof entry.teamId === 'string' && !!entry.teamId
             && typeof entry.periodId === 'string' && !!entry.periodId && entry.id === `team-route-reward:${entry.periodId}:self`
             && typeof entry.routeKey === 'string' && !!entry.routeKey && typeof entry.routeName === 'string' && !!entry.routeName
-            && entry.coins === TEAM_SHARED_ROUTE_COINS
+            && (entry.mode === 'duo' ? entry.coins === TEAM_DUO_COINS : entry.mode === undefined && entry.coins === TEAM_SHARED_ROUTE_COINS)
+        : entry.kind === 'city-relay-reward' ? (entry.reward === 'personal' || entry.reward === 'team')
+            && isCityRelayId(entry.teamId ?? entry.periodId)
+            && entry.id === cityRelayRewardId(entry.teamId ?? entry.periodId, entry.reward) && entry.coins === CITY_RELAY_COINS[entry.reward as CityRelayReward]
+            && typeof entry.routeName === 'string' && !!entry.routeName
+        : entry.kind === 'mileage-team-reward' ? isCityRelayId(entry.teamId)
+            && entry.id === mileageGrantId(entry.teamId) && isMileageTeamReward(entry.coins)
+            && typeof entry.targetName === 'string' && !!entry.targetName
         : entry.kind === 'demo-credit' ? entry.id === 'demo-credit' && entry.coins === COINS_PER_YUAN
           : entry.kind === 'medal-draw' ? MEDAL_DRAW_LEDGER_COSTS.includes(entry.coins) && Number.isInteger(entry.prizeIndex)
             && entry.prizeIndex >= 0 && entry.prizeIndex < MEDAL_LOTTERY_PRIZES.length

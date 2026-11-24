@@ -4,6 +4,7 @@ import { ArrowRight, Award, ChevronLeft, MapPin, Pause, Play, Volume2, VolumeX, 
 import { CITIES, getRouteData } from '../data/cities';
 import { reloadRunSceneryVideo } from '../lib/runScenery';
 import { coinMileageCounter, isCoinRouteComplete, type CoinExerciseEvidence } from '../journey/coinRewards';
+import { MILEAGE_METERS_PER_SECOND } from '../journey/mileageTeams';
 import { getJourneyCity } from '../journey/data';
 import { getMedalLandmarks } from '../journey/medalLottery';
 import CityImage from './CityImage';
@@ -25,6 +26,7 @@ interface RunPlaybackViewProps {
   requireFullRoute?: boolean;
   useActualStats?: boolean;
   demoCompleteSignal?: number;
+  trackTeamMileage?: boolean;
   coinRewards?: {
     demo: boolean;
     tracking: boolean;
@@ -43,7 +45,7 @@ const parsePlannedDuration = (value: string) => {
   return minutes * 60 + seconds;
 };
 
-export default function RunPlaybackView({ cityId, routeIndex, image, cityName: cityNameOverride, routeOverride, prepareScenery, onExit, onComplete, requireFullRoute = false, useActualStats = false, demoCompleteSignal = 0, coinRewards }: RunPlaybackViewProps) {
+export default function RunPlaybackView({ cityId, routeIndex, image, cityName: cityNameOverride, routeOverride, prepareScenery, onExit, onComplete, requireFullRoute = false, useActualStats = false, demoCompleteSignal = 0, trackTeamMileage = false, coinRewards }: RunPlaybackViewProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [distance, setDistance] = useState(0);
   const [time, setTime] = useState(0);
@@ -54,6 +56,8 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
   const runSummaryTitleId = useId();
   const sceneryHostRef = useRef<HTMLDivElement>(null);
   const sceneryVideoRef = useRef<HTMLVideoElement>(null);
+  const teamMeters = useRef(0);
+  const playbackMeters = useRef(0);
   const [sceneryVisible, setSceneryVisible] = useState(false);
   const [sceneryMuted, setSceneryMuted] = useState(true);
   const [sceneryStatus, setSceneryStatus] = useState<'loading' | 'playing' | 'retry'>('loading');
@@ -82,12 +86,23 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
 
   useEffect(() => {
     if (!runActive) return;
+    let lastVideoTime = sceneryVideoRef.current?.currentTime;
     const timer = window.setInterval(() => {
       setTime(value => value + 1);
       setDistance(value => Math.min(plannedDistance, value + 0.003));
+      if (trackTeamMileage) {
+        const video = sceneryVideoRef.current;
+        const next = Math.min(Math.round(plannedDistance * 1000), playbackMeters.current + MILEAGE_METERS_PER_SECOND);
+        if (video && !video.paused && !video.seeking && video.readyState >= video.HAVE_CURRENT_DATA
+          && lastVideoTime !== undefined && lastVideoTime !== video.currentTime) {
+          teamMeters.current += next - playbackMeters.current;
+        }
+        playbackMeters.current = next;
+        lastVideoTime = video?.currentTime;
+      }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [runActive, plannedDistance]);
+  }, [runActive, plannedDistance, trackTeamMileage]);
 
   useLayoutEffect(() => {
     const host = sceneryHostRef.current;
@@ -167,7 +182,9 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
   }).replace(/\//g, '/');
 
   const finishRun = () => {
-    if (coinRewards?.tracking && liveEvidence.meters > 0 && liveEvidence.activeSeconds > 0) setCoinEvidence(liveEvidence);
+    if ((coinRewards?.tracking || trackTeamMileage) && liveEvidence.meters > 0 && liveEvidence.activeSeconds > 0) {
+      setCoinEvidence({ ...liveEvidence, ...(trackTeamMileage && { teamMeters: teamMeters.current }) });
+    }
     setIsPlaying(false);
     setShowRunActions(false);
     setShowSummary(true);

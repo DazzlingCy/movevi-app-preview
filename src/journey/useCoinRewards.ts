@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { exerciseDay } from './dailyExercise';
-import { cashBalance, coinBalance, coinDayProgress, getAvailableMedals, getExchangedMedals, getMedalDraws, readCoinLedger, recordCashExchange, recordCashWithdrawal, recordMedalDraw, recordMedalExchange, recordStarterClaim, recordTeamRouteReward, settleCoinWorkout, TEAM_SHARED_ROUTE_COINS, type CoinLedger, type CoinTrack, type CoinWorkout } from './coinRewards';
+import { cashBalance, coinBalance, coinDayProgress, getAvailableMedals, getExchangedMedals, getMedalDraws, importMileageGrants, readCoinLedger, recordCashExchange, recordCashWithdrawal, recordCityRelayReward, recordMedalDraw, recordMedalExchange, recordStarterClaim, recordTeamRouteReward, settleCoinWorkout, type CoinEntry, type CoinLedger, type CoinTrack, type CoinWorkout } from './coinRewards';
+import type { MileageGrant } from './mileageTeams';
+import type { CityRelayAttempt } from './cityRelay';
 import type { PuzzleTeam } from './puzzleTeam';
 import { MEDAL_LOTTERY_DRAW_COST, MEDAL_LOTTERY_POOL_SIZE, PREVIEW_AVAILABLE_MEDALS, PREVIEW_EXCHANGED_MEDALS } from './medalLottery';
 
 declare const __APP_VERSION__: string;
+const isActivityClaim = (entry: CoinEntry) => entry.kind === 'team-route-reward' || entry.kind === 'city-relay-reward' || entry.kind === 'mileage-team-reward';
 
 function createPreviewLedger(): CoinLedger {
   const exchange = recordMedalExchange([], PREVIEW_EXCHANGED_MEDALS, Date.now());
@@ -24,14 +27,22 @@ export function useCoinRewards(demo: boolean) {
   const canSimulateWithdrawal = isPreview || demo;
   const previewMedals = isPreview ? PREVIEW_AVAILABLE_MEDALS : [];
   const key = demo ? 'movevi-coins-demo-v1' : 'movevi-coins-v1';
+  const previewTeamKey = `${key}:preview-team-rewards`;
   const wechatBindingKey = `${key}:wechat-preview-bound`;
   const readWechatBinding = () => {
     if (!canSimulateWithdrawal) return false;
     try { return localStorage.getItem(wechatBindingKey) === '1'; } catch { return false; }
   };
   const read = () => readCoinLedger(localStorage.getItem(key));
+  const withPreviewActivityClaims = (entries: CoinLedger): CoinLedger => [
+    ...entries.filter(entry => !isActivityClaim(entry)),
+    ...readCoinLedger(localStorage.getItem(previewTeamKey)).filter(isActivityClaim),
+  ];
   const [ledger, setLedger] = useState<CoinLedger>(() => {
-    if (transientPreview) return createPreviewLedger();
+    if (transientPreview) {
+      const seed = createPreviewLedger();
+      try { return withPreviewActivityClaims(seed); } catch { return seed; }
+    }
     try { return read(); } catch { return []; }
   });
   const latest = useRef(ledger);
@@ -79,6 +90,31 @@ export function useCoinRewards(demo: boolean) {
   const withLedgerLock = <T,>(mutate: () => T) => !transientPreview && navigator.locks
     ? navigator.locks.request(key, mutate) : mutate();
 
+  const claimActivityReward = async (apply: (ledger: CoinLedger) => CoinLedger) => {
+    if (!transientPreview) {
+      return withLedgerLock(() => {
+        let credited = 0;
+        const saved = update(previous => {
+          const next = apply(previous);
+          credited = coinBalance(next) - coinBalance(previous);
+          return next;
+        });
+        return saved ? credited : 0;
+      });
+    }
+    const claim = () => {
+      try {
+        const previous = withPreviewActivityClaims(latest.current);
+        const next = apply(previous);
+        if (next !== previous) localStorage.setItem(previewTeamKey, JSON.stringify(next.filter(isActivityClaim)));
+        latest.current = next;
+        setLedger(next);
+        return coinBalance(next) - coinBalance(previous);
+      } catch { return 0; }
+    };
+    return navigator.locks ? navigator.locks.request(previewTeamKey, claim) : claim();
+  };
+
   const day = exerciseDay(now);
   const starterClaims = new Set(publishedPreview
     ? (['mileage', 'route'] as const).filter(track => previewStarterClaims[track] === day)
@@ -105,9 +141,10 @@ export function useCoinRewards(demo: boolean) {
     exchangedMedals,
     medalDraws: getMedalDraws(ledger),
     claimedTeamPeriods: new Set<string>(ledger.flatMap(entry => entry.kind === 'team-route-reward' ? [entry.periodId] : [])),
-    async claimTeamRouteReward(team: PuzzleTeam, at: number) {
-      return withLedgerLock(() => update(previous => recordTeamRouteReward(previous, team, at)) ? TEAM_SHARED_ROUTE_COINS : 0);
-    },
+    cityRelayClaims: ledger.filter(entry => entry.kind === 'city-relay-reward'),
+    claimTeamRouteReward: (team: PuzzleTeam, at: number) => claimActivityReward(ledger => recordTeamRouteReward(ledger, team, at)),
+    claimCityRelayReward: (attempt: CityRelayAttempt, at: number) => claimActivityReward(ledger => recordCityRelayReward(ledger, attempt, at)),
+    syncMileageGrants: (grants: readonly MileageGrant[]) => claimActivityReward(ledger => importMileageGrants(ledger, grants)),
     async exchangeMedals(ids: readonly string[]) {
       const exchange = () => {
         const selected = new Set(ids);

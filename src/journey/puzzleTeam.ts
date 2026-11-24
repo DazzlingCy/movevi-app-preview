@@ -1,4 +1,5 @@
 import { weekendPeriod, periodOpen, WEEKEND_PRIZES, type WeekendPeriod } from './weekendRelay';
+import { getPuzzleSceneRoute, isPuzzleScene } from './puzzleScenes';
 export interface PuzzleCity { id: string; name: string; image: string }
 export interface PuzzleRoute extends PuzzleCity { routeId: string; routeIndex: number; title: string; distanceKm: number; minutes: number }
 export interface PuzzleMember { id: string; name: string; joinedAt: number; avatarUrl?: string }
@@ -9,6 +10,7 @@ export interface PuzzlePiece {
 export interface PuzzleTeam {
   id: string; city: PuzzleCity; createdAt: number; members: PuzzleMember[]; pieces: PuzzlePiece[];
   period: WeekendPeriod; draws: RelayDraw[]; archived?: boolean; duoPieces?: PuzzlePiece[]; sharedRoute?: PuzzleRoute;
+  mode?: 'duo';
 }
 export interface RelayDraw { id: string; memberId: string; cents: number; createdAt: number }
 export interface PuzzleState { version: 4; teams: PuzzleTeam[] }
@@ -17,14 +19,37 @@ export const PUZZLE_DEMO_STORAGE = 'movevi-weekend-relay-demo-account-v1';
 export const emptyPuzzleState = (): PuzzleState => ({ version: 4, teams: [] });
 export const currentPuzzle = (state: PuzzleState) => state.teams.slice().reverse().find(t => !t.archived && t.members.some(m=>m.id==='self'));
 export const periodParticipation = (state: PuzzleState, periodId: string, memberId='self') => state.teams.find(t=>t.period.id===periodId && t.members.some(m=>m.id===memberId));
-export const puzzleComplete = (team: PuzzleTeam) => team.pieces.length === 3 && (team.archived || team.members.length === 2) && new Set(team.pieces.map(p => p.memberId)).size >= 2;
+export const puzzleComplete = (team: PuzzleTeam) => team.mode !== 'duo' && team.pieces.length === 3 && (team.archived || team.members.length === 2) && new Set(team.pieces.map(p => p.memberId)).size >= 2;
 export const ownPieces = (team: PuzzleTeam, memberId = 'self') => team.pieces.filter(p => p.memberId === memberId);
 export const puzzleAllPieces = (team: PuzzleTeam) => [...team.pieces, ...(team.duoPieces ?? [])];
 const sameRoute = (a: PuzzleRoute, b: Pick<PuzzleRoute, 'id' | 'routeId'>) => a.id === b.id && a.routeId === b.routeId;
 
+function matchesDuoGoal(team: PuzzleTeam, route: Pick<PuzzleRoute, 'id' | 'routeId'>) {
+  return route.id === team.city.id && (isPuzzleScene(team.city.id)
+    ? !!getPuzzleSceneRoute(route)
+    : !!team.sharedRoute && sameRoute(team.sharedRoute, route));
+}
+
+function validDuoRun(team: PuzzleTeam, piece: PuzzlePiece) {
+  if (!matchesDuoGoal(team, piece.route)) return false;
+  const distance = isPuzzleScene(team.city.id)
+    ? getPuzzleSceneRoute(piece.route)?.route.distanceKm : team.sharedRoute?.distanceKm;
+  return !!distance && piece.route.distanceKm === distance
+    && Number.isFinite(piece.distanceKm) && piece.distanceKm >= distance
+    && team.members.some(member => member.id === piece.memberId)
+    && piece.startedAt >= Math.max(...team.members.map(member => member.joinedAt))
+    && piece.finishedAt >= piece.startedAt && periodOpen(team.period, piece.startedAt) && periodOpen(team.period, piece.finishedAt);
+}
+
+export function duoGoalComplete(team: PuzzleTeam) {
+  return team.mode === 'duo' && !team.archived && team.members.length === 2
+    && new Set(team.members.map(member => member.id)).size === 2 && team.pieces.length === 2
+    && team.members.every(member => team.pieces.some(piece => piece.memberId === member.id && validDuoRun(team, piece)));
+}
+
 /** The extra shared run does not consume a relay slot or award another draw. */
 export function sharedPuzzleRoute(team: PuzzleTeam): PuzzleRoute | undefined {
-  if (team.archived || team.members.length !== 2 || new Set(team.members.map(member => member.id)).size !== 2) return;
+  if (team.mode === 'duo' || team.archived || team.members.length !== 2 || new Set(team.members.map(member => member.id)).size !== 2) return;
   const pieces = puzzleAllPieces(team);
   return pieces.find(piece => (!team.sharedRoute || sameRoute(piece.route,team.sharedRoute)) && team.members.every(member => pieces.some(other =>
     other.memberId === member.id && sameRoute(other.route, piece.route)
@@ -39,19 +64,20 @@ export function canRunPuzzleRoute(team: PuzzleTeam, route: Pick<PuzzleRoute, 'id
   if (team.archived || team.members.length !== 2 || !periodOpen(team.period, now) || route.id !== team.city.id
     || !team.members.some(member => member.id === memberId)
     || puzzleAllPieces(team).some(piece => piece.memberId === memberId && sameRoute(piece.route, route))) return false;
+  if (team.mode === 'duo') return matchesDuoGoal(team, route) && !ownPieces(team, memberId).length;
   const partnerFinished = team.pieces.some(piece => piece.memberId !== memberId && sameRoute(piece.route, route));
   if (partnerFinished) return (!team.sharedRoute || sameRoute(team.sharedRoute,route)) && !sharedPuzzleRoute(team) && !team.duoPieces?.length;
   return !puzzleComplete(team) && ownPieces(team, memberId).length < 2;
 }
 
-export function canChooseSharedRoute(team: PuzzleTeam, now: number) {
-  return !team.archived && periodOpen(team.period,now) && team.members.some(member=>member.id==='self')
+export function canChooseSharedRoute(team: PuzzleTeam, now: number, memberId = 'self') {
+  return !team.archived && !isPuzzleScene(team.city.id) && periodOpen(team.period,now) && team.members.some(member=>member.id===memberId)
     && team.members.length <= 2 && puzzleAllPieces(team).length === 0;
 }
 
-export function choosePuzzleSharedRoute(state: PuzzleState, teamId: string, route: PuzzleRoute, now: number): PuzzleState {
+export function choosePuzzleSharedRoute(state: PuzzleState, teamId: string, route: PuzzleRoute, now: number, memberId = 'self'): PuzzleState {
   const team=state.teams.find(item=>item.id===teamId);
-  if(!team||!canChooseSharedRoute(team,now)||route.id!==team.city.id||!validSharedRoute(route)
+  if(!team||!canChooseSharedRoute(team,now,memberId)||route.id!==team.city.id||!validSharedRoute(route)
     ||team.sharedRoute?.routeId===route.routeId)return state;
   return {...state,teams:state.teams.map(item=>item.id===teamId?{...item,sharedRoute:{...route}}:item)};
 }
@@ -72,11 +98,11 @@ export function puzzleRouteChoices(team: PuzzleTeam | undefined, routes: PuzzleR
     && !completed.some(p => p.route.id === r.id && p.route.routeId === r.routeId))
     .sort((a,b) => a.minutes - b.minutes || a.routeIndex - b.routeIndex);
 }
-export function createPuzzle(state: PuzzleState, city: PuzzleCity, id: string, now: number, creator:Pick<PuzzleMember,'id'|'name'|'avatarUrl'>={id:'self',name:'你'}): PuzzleState {
+export function createPuzzle(state: PuzzleState, city: PuzzleCity, id: string, now: number, creator:Pick<PuzzleMember,'id'|'name'|'avatarUrl'>={id:'self',name:'你'}, mode?: PuzzleTeam['mode']): PuzzleState {
   const period=weekendPeriod(now);
   if(!id||!city.id||!creator.id||!creator.name||!Number.isFinite(now)||state.teams.some(t=>t.id===id)
     ||!periodOpen(period,now)||periodParticipation(state,period.id,creator.id))return state;
-  return {...state,teams:[...state.teams,{id,city,createdAt:now,members:[{...creator,joinedAt:now}],pieces:[],period,draws:[]}]};
+  return {...state,teams:[...state.teams,{id,city,createdAt:now,members:[{...creator,joinedAt:now}],pieces:[],period,draws:[],...(mode ? {mode} : {})}]};
 }
 export function joinPuzzle(state: PuzzleState, teamId: string, member: PuzzleMember): PuzzleState {
   const team=state.teams.find(t=>t.id===teamId);
@@ -93,7 +119,8 @@ export function finishPuzzle(state: PuzzleState, teamId: string, piece: PuzzlePi
     ||piece.finishedAt<piece.startedAt||piece.route.distanceKm<=0||piece.distanceKm<piece.route.distanceKm
     ||!Number.isInteger(piece.slot)||piece.slot<0||piece.slot>3
     ||state.teams.some(t=>puzzleAllPieces(t).some(p=>p.id===piece.id)))return state;
-  if (team.pieces.some(p => sameRoute(p.route, piece.route))) {
+  if (team.mode === 'duo' && !validDuoRun(team, piece)) return state;
+  if (team.mode !== 'duo' && team.pieces.some(p => sameRoute(p.route, piece.route))) {
     if (team.pieces.some(p => sameRoute(p.route, piece.route) && p.route.distanceKm !== piece.route.distanceKm)) return state;
     return {...state, teams: state.teams.map(t => t.id === teamId ? {...t, duoPieces: [{...piece, slot: 0}]} : t)};
   }
@@ -133,6 +160,9 @@ export function readPuzzle(storage?:Pick<Storage,'getItem'>, key=PUZZLE_STORAGE)
         &&t.members.some(m=>m.id===p.memberId)&&t.pieces.some(other=>other.memberId!==p.memberId&&sameRoute(other.route,p.route))
         &&!t.pieces.some(other=>other.id===p.id||other.memberId===p.memberId&&sameRoute(other.route,p.route)))))
       &&typeof t.period?.id==='string'&&Number.isFinite(t.period.startsAt)&&Number.isFinite(t.period.endsAt)
+      &&(t.mode===undefined||(t.mode==='duo'&&t.members.length<=2&&t.pieces.length<=2&&!t.duoPieces?.length
+        &&(!isPuzzleScene(t.city.id)||!t.sharedRoute)&&new Set(t.pieces.map(p=>p.memberId)).size===t.pieces.length
+        &&t.pieces.every(p=>validDuoRun(t,p))))
       &&Array.isArray(t.draws)&&t.draws.every(d=>typeof d.id==='string'&&typeof d.memberId==='string'&&Number.isFinite(d.createdAt)&&WEEKEND_PRIZES.some(p=>p.cents===d.cents))))
       return {...state,teams:state.teams.map((t:PuzzleTeam)=>t.members.length>2?{...t,archived:true}:t)};
   } catch { /* Keep the app usable if browser storage is unavailable. */ }

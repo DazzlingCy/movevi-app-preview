@@ -1,8 +1,8 @@
-import { createPuzzle, emptyPuzzleState, finishPuzzle, joinPuzzle, openPuzzleTeams, ownPieces, periodParticipation, canRunPuzzleRoute, type PuzzleCity, type PuzzleRoute, type PuzzleState } from './puzzleTeam';
+import { createPuzzle, duoGoalComplete, emptyPuzzleState, finishPuzzle, joinPuzzle, openPuzzleTeams, ownPieces, periodParticipation, canRunPuzzleRoute, puzzleComplete, readPuzzle, sharedPuzzleRoute, PUZZLE_DEMO_STORAGE, type PuzzleCity, type PuzzleRoute, type PuzzleState, type PuzzleTeam } from './puzzleTeam';
 import { weekendPeriod, periodOpen } from './weekendRelay';
 
-export const PUZZLE_DEMO_CLOCK='movevi-weekend-relay-demo-clock-v1';
 export const PUZZLE_LOBBY_LIMIT=10;
+export const PUZZLE_PREVIEW_PARTNER_ID='runner-0';
 
 /** The prototype previews an open activity by default, without changing its landing page. */
 export function getPuzzlePreviewMode(search:string):{enabled:boolean;openOnLoad:boolean} {
@@ -14,11 +14,11 @@ export function getPuzzlePreviewMode(search:string):{enabled:boolean;openOnLoad:
 export function joinPuzzleDemoPartner(state:PuzzleState,now:number):PuzzleState {
   const team=periodParticipation(state,weekendPeriod(now).id);
   return team&&team.members.length===1?joinPuzzle(state,team.id,{
-    id:'runner-0',name:'小林',avatarUrl:'https://i.pravatar.cc/100?img=11',joinedAt:now,
+    id:PUZZLE_PREVIEW_PARTNER_ID,name:'小林',avatarUrl:'https://i.pravatar.cc/100?img=11',joinedAt:now,
   }):state;
 }
 
-/** Invoked explicitly by the preview's partner-completion button. */
+/** Builds a finished partner run for relay test fixtures. */
 export function finishPuzzleDemoPartner(state:PuzzleState,now:number,selectedRoute?:PuzzleRoute):PuzzleState {
   const team=periodParticipation(state,weekendPeriod(now).id);
   if(!team||team.archived||team.members.length!==2||!periodOpen(team.period,now))return state;
@@ -34,13 +34,23 @@ export function finishPuzzleDemoPartner(state:PuzzleState,now:number,selectedRou
 }
 
 /** Each new preview entry starts a fresh local flow in an open weekend. */
-export function createPuzzlePreviewSession(cities:PuzzleCity[],realNow:number):{state:PuzzleState;now:number} {
+export function createPuzzlePreviewSession(cities:PuzzleCity[],realNow:number,mode?:PuzzleTeam['mode']):{state:PuzzleState;now:number} {
   const period=weekendPeriod(realNow),now=periodOpen(period,realNow)?realNow:period.startsAt+3600000;
-  return {state:seedPuzzleDemoLobby(emptyPuzzleState(),cities,now),now};
+  return {state:seedPuzzleDemoLobby(emptyPuzzleState(),cities,now,mode),now};
+}
+
+/** Discard unfinished preview attempts on load and keep completed teams available in history. */
+export function startDuoPreview(cities: PuzzleCity[], realNow: number, storage?: Pick<Storage, 'getItem'>) {
+  const saved = readPuzzle(storage, PUZZLE_DEMO_STORAGE);
+  const teams = saved.teams.filter(team => team.members.some(member => member.id === 'self')
+    && (team.archived || duoGoalComplete(team) || puzzleComplete(team) || sharedPuzzleRoute(team)));
+  const history = { ...saved, teams };
+  const now = unjoinedPuzzleWeekend(history, realNow);
+  return { state: seedPuzzleDemoLobby(history, cities, now, 'duo'), now };
 }
 
 /** Explicit preview accounts get joinable, persisted teams without enrolling the viewer. */
-export function seedPuzzleDemoLobby(state:PuzzleState,cities:PuzzleCity[],now:number):PuzzleState {
+export function seedPuzzleDemoLobby(state:PuzzleState,cities:PuzzleCity[],now:number,mode?:PuzzleTeam['mode']):PuzzleState {
   const period=weekendPeriod(now);
   if(!cities.length||!periodOpen(period,now))return state;
   const cityIds=new Set(cities.map(city=>city.id));
@@ -49,7 +59,7 @@ export function seedPuzzleDemoLobby(state:PuzzleState,cities:PuzzleCity[],now:nu
   for(let index=0;missing>0;index++) {
     const hostId='demo-host-'+index,id='demo-lobby-'+period.id+'-'+index;
     if(next.teams.some(t=>t.id===id)||periodParticipation(next,period.id,hostId))continue;
-    next=createPuzzle(next,cities[index%cities.length],id,now,{id:hostId,name:names[index%names.length],avatarUrl:'https://i.pravatar.cc/100?img='+(11+index%3)});
+    next=createPuzzle(next,cities[index%cities.length],id,now,{id:hostId,name:names[index%names.length],avatarUrl:'https://i.pravatar.cc/100?img='+(11+index%3)},mode);
     missing--;
   }
   return next;
