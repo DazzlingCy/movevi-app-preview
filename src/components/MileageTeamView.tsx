@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, Coins, Footprints, Plus, Sparkles, UsersRound, X } from 'lucide-react';
+import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, Coins, Footprints, LogOut, Plus, Sparkles, UsersRound, X } from 'lucide-react';
 import CityImage from './CityImage';
 import Modal from './journey/Modal';
 import { resolveLocalImage } from '../lib/localImages';
@@ -53,16 +53,18 @@ interface Props {
   error: string;
   choices: MileageChoice[];
   reduceMotion: boolean;
+  initialScrollTop: number;
   oldClaims: ReadonlySet<string>;
   onBack: () => void;
   onRun: (target: MileageTarget) => void;
+  onOpenRoute: (target: MileageTarget, routeId: string, scrollTop: number) => void;
   onRetry: () => void;
   onCommand: (command: MileageCommand) => Promise<boolean>;
   onOldClaim: (attempt: CityRelayAttempt, at: number) => Promise<number>;
 }
 
-export default function MileageTeamView({snapshot,error,choices,reduceMotion,oldClaims,onBack,onRun,onRetry,onCommand,onOldClaim}:Props) {
-  const pageRef=useRef<HTMLElement>(null);
+export default function MileageTeamView({snapshot,error,choices,reduceMotion,initialScrollTop,oldClaims,onBack,onRun,onOpenRoute,onRetry,onCommand,onOldClaim}:Props) {
+  const bodyRef=useRef<HTMLDivElement>(null);
   const [sheet,setSheet]=useState<Sheet>();
   const [joinCandidate,setJoinCandidate]=useState<MileageLobbyTeam>();
   const [receipt,setReceipt]=useState<{ coins: number; fromHistory: boolean }>();
@@ -76,8 +78,8 @@ export default function MileageTeamView({snapshot,error,choices,reduceMotion,old
   });
   const team=chooseAgain && snapshot?.current?.status==='complete'?undefined:snapshot?.current;
   useLayoutEffect(()=>{
-    if(pageRef.current)pageRef.current.scrollTop=0;
-  },[team?.id]);
+    if(bodyRef.current)bodyRef.current.scrollTop=team ? initialScrollTop : 0;
+  },[team?.id,initialScrollTop]);
   const canBrowse=!!snapshot&&!team;
   const self=team?.members.find(person=>person.id===snapshot?.self);
   const buddy=team?.members.find(person=>person.id!==snapshot?.self);
@@ -88,7 +90,7 @@ export default function MileageTeamView({snapshot,error,choices,reduceMotion,old
   const active=team?.status==='active';
   const complete=team?.status==='complete';
   const claimed=self?.claimedAt!==undefined;
-  const actionLayout=canBrowse||team?(active||complete&&!claimed?'double':'single'):undefined;
+  const RewardCard=claimed?'div':'button';
   const canSimulateOwnMileage=active&&previewBuddy&&self&&self.meters<MILEAGE_MEMBER_GOAL;
   const canSimulateMileage=active&&previewBuddy&&buddy.meters<goalMeters-MILEAGE_MEMBER_GOAL;
   const memberShortfall=active&&snapshot?mileageMemberShortfall(team,snapshot.self):undefined;
@@ -156,14 +158,14 @@ export default function MileageTeamView({snapshot,error,choices,reduceMotion,old
   };
   const rulesButton=<button type="button" className={styles.rulesLink} onClick={()=>setSheet('rules')}><BookOpen size={17} aria-hidden="true"/>规则</button>;
 
-  return <main ref={pageRef} className={styles.page} id="main-content" aria-labelledby="mileage-title"
-    data-modal-open={!!sheet} data-action-layout={actionLayout} data-reduce-motion={reduceMotion}>
+  return <main className={styles.page} id="main-content" aria-labelledby="mileage-title"
+    data-modal-open={!!sheet} data-reduce-motion={reduceMotion}>
     <nav className={styles.nav} aria-label="活动导航">
       <button type="button" onClick={onBack} aria-label="返回活动"><ChevronLeft size={21} aria-hidden="true"/></button>
       <h1 className={styles.navTitle} id="mileage-title">{MILEAGE_TEAM_NAME}</h1>
       <button type="button" onClick={()=>setSheet('history')}>{titles.history}{hasUnclaimed&&<span className={styles.historyDot} aria-label="有奖励待领取"/>}</button>
     </nav>
-    <div className={styles.body}>
+    <div ref={bodyRef} className={styles.body}>
       <section className={styles.hero} data-team={!!team} aria-labelledby="mileage-hero">
         <div className={styles.heroCover}>
           <div className={styles.heroImage} aria-hidden="true">
@@ -172,7 +174,10 @@ export default function MileageTeamView({snapshot,error,choices,reduceMotion,old
           <header className={styles.heroCopy}>
             {team?<div className={styles.teamTitle}>
               <h2 id="mileage-hero">{team.target.name}小队</h2>
-              {team.status!=='complete'&&<p>{waiting?`${goalKm} km · `:''}达标各领 {rewardCoins} 金币</p>}
+              {!complete&&<>
+                {waiting&&<span className={styles.teamGoal}>{goalKm} km</span>}
+                <span className={styles.heroReward}><Coins size={14} aria-hidden="true"/>{rewardCoins} 金币/人</span>
+              </>}
             </div>:<p className={styles.coverHeadline}>找个搭子，一起跑</p>}
           </header>
         </div>
@@ -201,6 +206,8 @@ export default function MileageTeamView({snapshot,error,choices,reduceMotion,old
                 ? <><span>合计</span> {formatTeamKm(total)} <span>km</span></>
                 : <>{formatTeamKm(total)} <span>/ {goalKm} km</span></>}
             </strong>
+            {active&&<button type="button" className={styles.exitButton} aria-label="退出小队" title="退出小队"
+              aria-haspopup="dialog" onClick={()=>setSheet('leave')}><LogOut size={18} aria-hidden="true"/></button>}
           </header>
           {!waiting&&!complete&&<progress className={styles.progress} value={Math.min(total,goalMeters)} max={goalMeters} aria-label="小队累计里程"/>}
           <ul className={complete?`${styles.memberGrid} ${styles.finishedMembers}`:styles.memberGrid} aria-label="小队成员">
@@ -220,13 +227,15 @@ export default function MileageTeamView({snapshot,error,choices,reduceMotion,old
             </li>
           </ul>
           {memberShortfall&&<p className={styles.missing} role="status">{memberShortfall}</p>}
-          {complete&&<div className={styles.rewardSummary}>
+          {complete&&<RewardCard className={styles.rewardSummary} {...(!claimed&&{
+            type:'button', disabled:busy, 'aria-label':`领取 ${rewardCoins} 金币`, onClick:()=>void claimReward(team),
+          })}>
             <span className={styles.rewardSummaryIcon}><Coins size={18} aria-hidden="true"/></span>
             <strong>{rewardCoins} <span>金币</span></strong>
-            <span className={styles.rewardStatus} data-claimed={claimed} role="status">
-              {claimed&&<Check size={13} aria-hidden="true"/>}{claimed?'已领取':'待领取'}
+            <span className={styles.rewardStatus} data-claimed={claimed} role={claimed?'status':undefined}>
+              {claimed?<><Check size={13} aria-hidden="true"/>已领取</>:<>领取<ChevronRight size={14} aria-hidden="true"/></>}
             </span>
-          </div>}
+          </RewardCard>}
         </section>}
       {canBrowse?<section className={styles.lobby} aria-labelledby="mileage-lobby">
         <header className={styles.panelHeader}>
@@ -236,24 +245,28 @@ export default function MileageTeamView({snapshot,error,choices,reduceMotion,old
         {lobbyTeams.length>0
           ? <ul className={`${styles.choices} ${styles.lobbyChoices}`}>{lobbyTeams.map(renderLobbyTeam)}</ul>
           : <p className={styles.empty}>暂无等待中的队伍</p>}
-      </section>:teamRoutes?.length?<section className={styles.routePanel} aria-labelledby="mileage-routes">
+      </section>:team&&teamRoutes?.length?<section className={styles.routePanel} aria-labelledby="mileage-routes">
         <header className={styles.panelHeader}>
           <h2 id="mileage-routes">本队路线</h2>
           {rulesButton}
         </header>
         <ul className={styles.routeList}>
           {teamRoutes.map(route=><li key={route.routeId}>
-            <CityImage src={route.image} alt="" className={styles.thumb}/>
-            <div>
-              <strong>{route.title}</strong>
-              <small>{route.distanceKm} km · 约 {route.minutes} 分钟</small>
-            </div>
+            <button type="button" className={styles.routeLink}
+              onClick={()=>onOpenRoute(team.target,route.routeId,bodyRef.current?.scrollTop??0)}>
+              <CityImage src={route.image} alt="" className={styles.thumb}/>
+              <span>
+                <strong>{route.title}</strong>
+                <small>{route.distanceKm} km · 约 {route.minutes} 分钟</small>
+              </span>
+              <ChevronRight size={16} aria-hidden="true"/>
+            </button>
           </li>)}
         </ul>
       </section>:<div className={styles.utilities} data-center={complete}>{rulesButton}</div>}
     </div>
 
-    {actionLayout&&<footer className={styles.actionBar} aria-label="小队操作">
+    {(canBrowse||team)&&<footer className={styles.actionBar} aria-label="小队操作">
       <div className={styles.actionBarContent}>
         {error&&!sheet&&<p className={styles.error} role="status">{error}</p>}
         {canBrowse&&<button type="button" className={styles.primary} data-tone="create" disabled={busy} onClick={openCreate}>
@@ -266,19 +279,9 @@ export default function MileageTeamView({snapshot,error,choices,reduceMotion,old
           <button type="button" className={styles.primary} disabled={!target} onClick={()=>onRun(team.target)}>
             <Footprints size={18} aria-hidden="true"/>去跑步<ArrowRight size={17} aria-hidden="true"/>
           </button>
-          <button type="button" className={styles.chooseMode} data-tone="exit" onClick={()=>setSheet('leave')}>退出小队</button>
         </>}
-        {team&&complete&&(
-          claimed
-            ? <button type="button" className={styles.primary} data-tone="regroup" onClick={()=>setChooseAgain(true)}>重新组队</button>
-            : <>
-              <button type="button" className={styles.primary} data-tone="claim" disabled={busy} onClick={()=>void claimReward(team)}>
-                <Coins size={18} aria-hidden="true"/>领取金币
-              </button>
-              <button type="button" className={styles.chooseMode} data-tone="regroup" disabled={busy}
-                onClick={()=>setChooseAgain(true)}>重新组队</button>
-            </>
-        )}
+        {team&&complete&&<button type="button" className={styles.primary} data-tone="regroup"
+          disabled={busy} onClick={()=>setChooseAgain(true)}>重新组队</button>}
       </div>
     </footer>}
 
