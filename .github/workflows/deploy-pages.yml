@@ -41,7 +41,8 @@ jobs:
 
       - name: Keep repository media outside the Pages artifact
         run: |
-          rm -rf dist/video
+          find dist/video -type f ! -name 'open-trail-demo.*' -delete
+          find dist/video -type d -empty -delete
           find dist/images -mindepth 1 -maxdepth 1 ! -name welfare ! -name run-scenes -exec rm -rf {} +
 
       - name: Configure Pages
