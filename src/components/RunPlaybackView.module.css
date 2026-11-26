@@ -233,11 +233,6 @@
   font-size: 13px;
 }
 
-button.sceneryNotice {
-  cursor: pointer;
-  pointer-events: auto;
-}
-
 .playbackControls {
   --control-gap: 7px;
   position: absolute;
@@ -259,6 +254,18 @@ button.sceneryNotice {
   overflow-y: auto;
   scrollbar-width: none;
   pointer-events: auto;
+}
+
+.playbackControls .reloadScenery {
+  align-content: center;
+  gap: 2px;
+  font-size: 9px;
+  line-height: 1.1;
+}
+
+.playbackControls .reloadScenery[data-retry] {
+  border-color: var(--run-accent);
+  color: var(--run-accent);
 }
 
 .backButton, .playbackControls button {

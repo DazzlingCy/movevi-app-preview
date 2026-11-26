@@ -11,9 +11,3 @@ export function createRunSceneryVideo(): HTMLVideoElement {
   video.src = runScenerySource;
   return video;
 }
-
-export function reloadRunSceneryVideo(video: HTMLVideoElement): void {
-  const position = video.currentTime;
-  video.load();
-  if (position > 0) video.currentTime = position;
-}

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { Airplay, ArrowRight, Award, ChevronLeft, Maximize2, Pause, Play, X } from 'lucide-react';
+import { Airplay, ArrowRight, Award, ChevronLeft, Maximize2, Pause, Play, RotateCw, X } from 'lucide-react';
 import { CITIES, getRouteData } from '../data/cities';
 import { getRouteCategory } from '../data/routeCategories';
-import { reloadRunSceneryVideo, runSceneryPoster } from '../lib/runScenery';
+import { runSceneryPoster } from '../lib/runScenery';
+import { observeScenery, startSceneryWatch } from '../journey/sceneryWatch';
 import { coinMileageCounter, isCoinRouteComplete, type CoinExerciseEvidence } from '../journey/coinRewards';
 import { MILEAGE_METERS_PER_SECOND } from '../journey/mileageTeams';
 import { getJourneyCity } from '../journey/data';
@@ -17,8 +18,6 @@ import { RunSpeedDrawer } from './RunSpeedPicker';
 import type { CityRouteListItem } from './CityRoutesView';
 import Modal from './journey/Modal';
 import styles from './RunPlaybackView.module.css';
-
-const sceneryLoadTimeoutMs = 8000;
 
 interface RunPlaybackViewProps {
   cityId: string;
@@ -145,6 +144,8 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
   const runSummaryTitleId = useId();
   const sceneryHostRef = useRef<HTMLDivElement>(null);
   const sceneryVideoRef = useRef<HTMLVideoElement>(null);
+  const sceneryWatch = useRef<ReturnType<typeof startSceneryWatch> | null>(null);
+  const sceneryAttempt = useRef(0);
   const [sceneryVisible, setSceneryVisible] = useState(false);
   const [sceneryStatus, setSceneryStatus] = useState<'loading' | 'playing' | 'retry'>('loading');
   const reduceMotion = useReducedMotion();
@@ -209,25 +210,18 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
     const host = sceneryHostRef.current;
     if (!host) return;
     const video = prepareScenery();
-    const showScenery = () => {
-      setSceneryVisible(true);
-      setSceneryStatus('playing');
-    };
-    const showBuffering = () => setSceneryStatus(status => status === 'playing' ? 'loading' : status);
-    const showRetry = () => {
-      setSceneryVisible(false);
-      setSceneryStatus('retry');
-    };
-    video.addEventListener('playing', showScenery);
-    video.addEventListener('waiting', showBuffering);
+    // Reveal the video layer before monitoring rendered frames. A fully covered
+    // layer may not deliver a frame callback until the cover is removed.
+    const showVideo = () => setSceneryVisible(true);
+    const showRetry = () => setSceneryStatus('retry');
+    video.addEventListener('playing', showVideo);
     video.addEventListener('error', showRetry);
     host.append(video);
     sceneryVideoRef.current = video;
     if (video.error) showRetry();
-    else if (!video.paused && video.readyState >= video.HAVE_FUTURE_DATA) showScenery();
+    else if (video.readyState >= video.HAVE_CURRENT_DATA && !video.paused) showVideo();
     return () => {
-      video.removeEventListener('playing', showScenery);
-      video.removeEventListener('waiting', showBuffering);
+      video.removeEventListener('playing', showVideo);
       video.removeEventListener('error', showRetry);
       video.pause();
       if (video.readyState !== video.HAVE_NOTHING) video.currentTime = 0;
@@ -238,15 +232,21 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
     };
   }, [prepareScenery]);
 
-  const playScenery = useCallback((retry = false) => {
+  const playScenery = useCallback((reload = false) => {
     const video = sceneryVideoRef.current;
     if (!video) return;
-    if (video.paused || retry) setSceneryStatus('loading');
-    if (video.error || (retry && video.readyState < video.HAVE_FUTURE_DATA)) {
-      reloadRunSceneryVideo(video);
+    const attempt = ++sceneryAttempt.current;
+    if (reload || video.error) {
+      sceneryWatch.current = null;
+      setSceneryVisible(false);
+      video.muted = true;
+      video.preload = 'auto';
+      video.load();
     }
+    if (video.paused || reload) setSceneryStatus('loading');
+    // On manual reload, call play in this click handler so Safari keeps the user gesture.
     void video.play().catch(error => {
-      if (error.name !== 'AbortError') setSceneryStatus('retry');
+      if (sceneryAttempt.current === attempt && error.name !== 'AbortError') setSceneryStatus('retry');
     });
   }, []);
 
@@ -254,14 +254,50 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
     const video = sceneryVideoRef.current;
     if (!video || !runActive) return;
     playScenery();
-    return () => video.pause();
+    return () => {
+      sceneryAttempt.current++;
+      video.pause();
+    };
   }, [playScenery, runActive]);
 
   useEffect(() => {
-    if (!runActive || sceneryStatus !== 'loading') return;
-    const timer = window.setTimeout(() => setSceneryStatus('retry'), sceneryLoadTimeoutMs);
-    return () => window.clearTimeout(timer);
-  }, [runActive, sceneryStatus]);
+    const video = sceneryVideoRef.current;
+    if (!video || !runActive) return;
+    const tracksFrames = typeof video.requestVideoFrameCallback === 'function';
+    let frameRequest: number | undefined;
+    let presented = 0;
+    const reset = () => {
+      sceneryWatch.current = startSceneryWatch(performance.now(), tracksFrames ? presented : video.currentTime);
+    };
+    reset();
+    if (tracksFrames) {
+      const onFrame = () => {
+        presented++;
+        frameRequest = video.requestVideoFrameCallback(onFrame);
+      };
+      frameRequest = video.requestVideoFrameCallback(onFrame);
+    }
+    const sample = () => {
+      if (document.hidden) return;
+      const now = performance.now();
+      const position = tracksFrames ? presented : video.currentTime;
+      const watch = sceneryWatch.current ?? startSceneryWatch(now, position);
+      const observation = observeScenery(watch, { now, position, playing: !video.paused && !video.seeking && !video.error });
+      sceneryWatch.current = observation.watch;
+      if (observation.status === 'advanced') {
+        setSceneryVisible(true);
+        setSceneryStatus('playing');
+      } else if (observation.status === 'stalled') setSceneryStatus('retry');
+    };
+    const timer = window.setInterval(sample, 500);
+    document.addEventListener('visibilitychange', reset);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', reset);
+      if (frameRequest !== undefined) video.cancelVideoFrameCallback(frameRequest);
+      sceneryWatch.current = null;
+    };
+  }, [prepareScenery, runActive]);
 
   const result = useMemo(() => {
     const resultDistance = requireFullRoute || useActualStats || speed || distance >= 0.05 ? distance : plannedDistance;
@@ -339,20 +375,20 @@ export default function RunPlaybackView({ cityId, routeIndex, image, cityName: c
           <div><dt>千卡</dt><dd>{Math.round(distance * 65)}</dd></div>
         </dl>
         {!showSummary && <RunPlaybackMusic audioRef={musicRef} track={musicTrack} runActive={runActive} />}
-        {runActive && sceneryStatus === 'loading' && (
-          <p className={styles.sceneryNotice} role="status">正在加载视频…</p>
-        )}
-        {runActive && sceneryStatus === 'retry' && (
-          <button className={styles.sceneryNotice} type="button" onClick={() => playScenery(true)}>
-            <Play size={16} aria-hidden="true" /> 点按播放视频
-          </button>
+        {runActive && sceneryStatus !== 'playing' && (
+          <p className={styles.sceneryNotice} role="status">
+            {sceneryStatus === 'retry' ? '画面未播放，请重新加载' : '正在加载视频…'}
+          </p>
         )}
         {speed?.mode === 'smart' && !showSummary && <SmartSpeedChart speed={speed} routeKm={plannedDistance} routeSeconds={plannedDuration} elapsed={time} actual={speedSamples} />}
         {!showSummary && (
           <div className={styles.playbackControls}>
             {!showRunActions && <>
               <div className={styles.mediaControls}>
-                <button type="button" disabled>高清</button>
+                <button type="button" className={styles.reloadScenery} aria-label="重新加载画面" title="重新加载画面"
+                  data-retry={sceneryStatus === 'retry' || undefined} onClick={() => playScenery(true)}>
+                  <RotateCw size={15} aria-hidden="true" /><span>重载画面</span>
+                </button>
                 <button type="button" aria-label="全屏" disabled><Maximize2 size={18} aria-hidden="true" /></button>
                 <button type="button" aria-label="投屏" disabled><Airplay size={18} aria-hidden="true" /></button>
               </div>
