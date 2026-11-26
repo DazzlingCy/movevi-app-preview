@@ -8,6 +8,13 @@ test('a video reporting play but remaining on its first frame is detected as sta
   assert.equal(observeScenery(watch, { now: sceneryStallTimeoutMs, position: 0, playing: true }).status, 'stalled');
 });
 
+test('a segmented stream can finish buffering before the first-frame deadline', () => {
+  const watch = startSceneryWatch(0, 0);
+  assert.equal(observeScenery(watch, { now: 9000, position: 0, playing: true, timeoutMs: 25_000 }).status, 'pending');
+  assert.equal(observeScenery(watch, { now: 16000, position: 1, playing: true, timeoutMs: 25_000 }).status, 'advanced');
+  assert.equal(observeScenery(watch, { now: 25000, position: 0, playing: true, timeoutMs: 25_000 }).status, 'stalled');
+});
+
 test('actual progress, including looping back to the beginning, restarts the stall window', () => {
   const watch = startSceneryWatch(0, 114.5);
   const loop = observeScenery(watch, { now: 1000, position: 0.5, playing: true });

@@ -6,7 +6,8 @@ import { getTeamCoinReward, TEAM_DUO_COINS, TEAM_SHARED_ROUTE_COINS } from '../j
 import CityImage from './CityImage';
 import Modal from './journey/Modal';
 import { resolveLocalImage } from '../lib/localImages';
-import { runScenerySource } from '../lib/runScenery';
+import { preferredRunSceneryFormat, runSceneryUrl } from '../lib/runScenery';
+import type { RunSceneryFormat } from '../journey/sceneryFormat';
 import { previewPuzzleHistory } from '../journey/puzzleHistory';
 import { PUZZLE_LOBBY_LIMIT } from '../journey/puzzleDemo';
 import { puzzleProgressFeedback } from '../journey/puzzleFeedback';
@@ -37,11 +38,19 @@ const trialDurationSeconds = 12;
 
 export function RelayTrialRun({ route, onBack, onFinish }:{route:PuzzleRoute;onBack:()=>void;onFinish:()=>void}) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoFormat = useRef<RunSceneryFormat>('mp4');
   const [duration,setDuration] = useState(0);
   const [seconds,setSeconds] = useState(0);
   const [playing,setPlaying] = useState(false);
   const [complete,setComplete] = useState(false);
   const [failed,setFailed] = useState(false);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) {
+      videoFormat.current = preferredRunSceneryFormat(video);
+      video.src = runSceneryUrl(videoFormat.current);
+    }
+  }, []);
   const toggleVideo = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -65,7 +74,7 @@ export function RelayTrialRun({ route, onBack, onFinish }:{route:PuzzleRoute;onB
       <section className={styles.task} aria-label="当前路线">
         <header className={`${styles.taskHero} ${styles.trialHero}`}>
           <CityImage src={route.image} className={styles.taskPhoto} alt="" loading="eager"/>
-          <video ref={videoRef} className={styles.trialVideo} data-loaded={duration>0&&!failed} src={runScenerySource} autoPlay muted playsInline
+          <video ref={videoRef} className={styles.trialVideo} data-loaded={duration>0&&!failed} autoPlay muted playsInline
             aria-label="体验跑视频" onLoadedMetadata={event=>setDuration(Math.min(trialDurationSeconds,event.currentTarget.duration))}
             onTimeUpdate={event=>{
               const video=event.currentTarget;
@@ -74,7 +83,13 @@ export function RelayTrialRun({ route, onBack, onFinish }:{route:PuzzleRoute;onB
             }}
             onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)}
             onEnded={()=>{setPlaying(false);setComplete(true);}}
-            onError={()=>{setPlaying(false);setFailed(true);}}/>
+            onError={event=>{
+              setPlaying(false);
+              if (videoFormat.current==='hls') {
+                videoFormat.current='mp4';
+                event.currentTarget.src=runSceneryUrl('mp4');
+              } else setFailed(true);
+            }}/>
           <div className={styles.taskHeading}><h2>{route.title}</h2><small>通用体验视频</small></div>
         </header>
         <div className={styles.taskContent}>

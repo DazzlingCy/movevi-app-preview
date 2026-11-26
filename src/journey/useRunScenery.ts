@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createRunSceneryVideo } from '../lib/runScenery';
+import { createRunSceneryVideo, preferredRunSceneryFormat, runSceneryUrl } from '../lib/runScenery';
+import type { RunSceneryFormat } from './sceneryFormat';
 import { observeScenery, startSceneryWatch } from './sceneryWatch';
 
 type ScenerySession = {
+  format: RunSceneryFormat;
+  hasAdvanced: boolean;
   position: () => number;
+  fallback: () => boolean;
   dispose: () => void;
 };
 
@@ -14,13 +18,25 @@ export function useRunScenery(runActive: boolean) {
   const watch = useRef<ReturnType<typeof startSceneryWatch> | null>(null);
   const retryCount = useRef(0);
   const playRequest = useRef(0);
+  const wantsPlayback = useRef(false);
   const [status, setStatus] = useState<'loading' | 'playing' | 'retry'>('loading');
+
+  const playVideo = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const request = ++playRequest.current;
+    void video.play().catch(error => {
+      if (videoRef.current !== video || playRequest.current !== request || error.name === 'AbortError') return;
+      if (error.name === 'NotSupportedError' && sessionRef.current?.fallback()) return;
+      setStatus('retry');
+    });
+  }, []);
 
   const mountVideo = useCallback((retryId?: string) => {
     const host = hostRef.current;
     if (!host) return;
     sessionRef.current?.dispose();
-    const video = createRunSceneryVideo(retryId);
+    const video = createRunSceneryVideo();
     const tracksFrames = typeof video.requestVideoFrameCallback === 'function';
     let frameRequest: number | undefined;
     let presented = 0;
@@ -31,7 +47,7 @@ export function useRunScenery(runActive: boolean) {
       frameRequest = video.requestVideoFrameCallback(onFrame);
     };
     const fail = () => {
-      if (videoRef.current === video) setStatus('retry');
+      if (videoRef.current === video && !sessionRef.current?.fallback()) setStatus('retry');
     };
     videoRef.current = video;
     const position = () => tracksFrames ? presented : video.currentTime;
@@ -39,8 +55,20 @@ export function useRunScenery(runActive: boolean) {
     video.addEventListener('error', fail);
     if (tracksFrames) frameRequest = video.requestVideoFrameCallback(onFrame);
     host.append(video);
-    sessionRef.current = {
+    const session: ScenerySession = {
+      format: preferredRunSceneryFormat(video),
+      hasAdvanced: false,
       position,
+      fallback: () => {
+        if (videoRef.current !== video || session.format !== 'hls') return false;
+        session.format = 'mp4';
+        session.hasAdvanced = false;
+        video.src = runSceneryUrl('mp4', retryId);
+        watch.current = startSceneryWatch(performance.now(), position());
+        setStatus('loading');
+        if (wantsPlayback.current) playVideo();
+        return true;
+      },
       dispose: () => {
         disposed = true;
         video.removeEventListener('error', fail);
@@ -51,19 +79,10 @@ export function useRunScenery(runActive: boolean) {
         video.remove();
       },
     };
+    sessionRef.current = session;
+    video.src = runSceneryUrl(session.format, retryId);
     setStatus('loading');
-  }, []);
-
-  const playVideo = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const request = ++playRequest.current;
-    void video.play().catch(error => {
-      if (videoRef.current === video && playRequest.current === request && error.name !== 'AbortError') {
-        setStatus('retry');
-      }
-    });
-  }, []);
+  }, [playVideo]);
 
   useLayoutEffect(() => {
     mountVideo();
@@ -77,6 +96,7 @@ export function useRunScenery(runActive: boolean) {
 
   useEffect(() => {
     if (!runActive) return;
+    wantsPlayback.current = true;
     const reset = () => {
       const session = sessionRef.current;
       if (session) watch.current = startSceneryWatch(performance.now(), session.position());
@@ -89,13 +109,19 @@ export function useRunScenery(runActive: boolean) {
       if (document.hidden || !video || !session || !watch.current) return;
       const observation = observeScenery(watch.current, {
         now: performance.now(), position: session.position(), playing: !video.paused && !video.seeking && !video.error,
+        // The original 1080p stream starts with a 10-second segment. Don't
+        // suggest interrupting that initial download after only eight seconds.
+        timeoutMs: session.format === 'hls' && !session.hasAdvanced ? 25_000 : undefined,
       });
       watch.current = observation.watch;
-      if (observation.status === 'advanced') setStatus('playing');
-      else if (observation.status === 'stalled') setStatus('retry');
+      if (observation.status === 'advanced') {
+        session.hasAdvanced = true;
+        setStatus('playing');
+      } else if (observation.status === 'stalled') setStatus('retry');
     }, 500);
     document.addEventListener('visibilitychange', reset);
     return () => {
+      wantsPlayback.current = false;
       playRequest.current++;
       videoRef.current?.pause();
       window.clearInterval(timer);

@@ -37,6 +37,8 @@ jobs:
         run: npm run lint
 
       - name: Build
+        env:
+          VITE_RUN_SCENERY_HLS: '1'
         run: npm run build
 
       - name: Keep repository media outside the Pages artifact
@@ -44,6 +46,14 @@ jobs:
           find dist/video -type f ! -name 'open-trail-demo.*' -delete
           find dist/video -type d -empty -delete
           find dist/images -mindepth 1 -maxdepth 1 ! -name welfare ! -name run-scenes -exec rm -rf {} +
+
+      - name: Package lossless HLS for iPhone Safari
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          node scripts/build-run-scenery-hls.mjs
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
