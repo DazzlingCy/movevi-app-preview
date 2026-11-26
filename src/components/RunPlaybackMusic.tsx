@@ -41,13 +41,17 @@ export default function RunPlaybackMusic({ audioRef, track, runActive }: {
   runActive: boolean;
 }) {
   const lineId = useId();
-  const [enabled, setEnabled] = useState(true);
+  const wantsMusic = useRef(true);
+  const [playing, setPlaying] = useState(false);
   const [lineIndex, setLineIndex] = useState(0);
   const { cues } = track;
 
-  const play = useCallback(() => {
-    void audioRef.current?.play().catch((error: DOMException) => {
-      if (error.name !== 'AbortError') setEnabled(false);
+  const play = useCallback((reload = false) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (reload && audio.error) audio.load();
+    void audio.play().catch(() => {
+      if (audio.paused) setPlaying(false);
     });
   }, [audioRef]);
 
@@ -58,40 +62,65 @@ export default function RunPlaybackMusic({ audioRef, track, runActive }: {
       const nextCue = cues.findIndex(cue => cue.at > audio.currentTime);
       setLineIndex(nextCue === -1 ? cues.length - 1 : Math.max(0, nextCue - 1));
     };
-    const showRetry = () => setEnabled(false);
     syncLyrics();
     audio.addEventListener('timeupdate', syncLyrics);
-    audio.addEventListener('error', showRetry);
     return () => {
       audio.removeEventListener('timeupdate', syncLyrics);
-      audio.removeEventListener('error', showRetry);
     };
   }, [audioRef, cues]);
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !runActive || !enabled) return;
-    if (audio.paused) play();
-    return () => audio.pause();
-  }, [audioRef, enabled, play, runActive]);
+    if (!audio) return;
+    if (!runActive) {
+      audio.pause();
+      setPlaying(false);
+      return;
+    }
+
+    let recoveryTimer: number | undefined;
+    let recoveryUsed = false;
+    const onPlaying = () => setPlaying(true);
+    const onError = () => setPlaying(false);
+    const onPause = () => {
+      setPlaying(false);
+      if (!wantsMusic.current || document.hidden || audio.error || audio.ended || recoveryUsed) return;
+      recoveryUsed = true;
+      recoveryTimer = window.setTimeout(() => {
+        if (wantsMusic.current && audio.paused && !document.hidden) play();
+      }, 250);
+    };
+    audio.addEventListener('playing', onPlaying);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('error', onError);
+    setPlaying(!audio.paused && audio.readyState >= audio.HAVE_CURRENT_DATA);
+    if (wantsMusic.current && audio.paused) play();
+    return () => {
+      window.clearTimeout(recoveryTimer);
+      audio.removeEventListener('playing', onPlaying);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('error', onError);
+      audio.pause();
+    };
+  }, [audioRef, play, runActive]);
 
   const cue = cues[lineIndex];
   const cueDuration = (cues[lineIndex + 1]?.at ?? Infinity) - cue.at;
 
   return (
     <button type="button" className={styles.musicStatus} disabled={!runActive}
-      aria-label={enabled ? '暂停音乐' : '播放音乐'} aria-describedby={enabled ? lineId : undefined}
+      aria-label={playing ? '暂停音乐' : '播放音乐'} aria-describedby={playing ? lineId : undefined}
       onClick={() => {
-        if (enabled) {
+        if (playing) {
+          wantsMusic.current = false;
           audioRef.current?.pause();
-          setEnabled(false);
         } else {
-          setEnabled(true);
-          play();
+          wantsMusic.current = true;
+          play(true);
         }
       }}>
-      {enabled ? <Pause size={14} aria-hidden="true" /> : <Music2 size={14} aria-hidden="true" />}
-      {enabled ? <>
+      {playing ? <Pause size={14} aria-hidden="true" /> : <Music2 size={14} aria-hidden="true" />}
+      {playing ? <>
         <Fragment key={cue.at}>
           <ScrollingLyric line={cue.line} cueDuration={cueDuration} />
         </Fragment>

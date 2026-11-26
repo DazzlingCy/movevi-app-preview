@@ -50,8 +50,9 @@ export function useRunScenery(runActive: boolean) {
       if (videoRef.current === video && !sessionRef.current?.fallback()) setStatus('retry');
     };
     videoRef.current = video;
-    const position = () => tracksFrames ? presented : video.currentTime;
-    watch.current = startSceneryWatch(performance.now(), position());
+    // Native HLS can advance without delivering a compositor callback. Use
+    // its media clock to avoid flagging healthy playback as stalled.
+    const position = () => session.format === 'hls' || !tracksFrames ? video.currentTime : presented;
     video.addEventListener('error', fail);
     if (tracksFrames) frameRequest = video.requestVideoFrameCallback(onFrame);
     host.append(video);
@@ -63,6 +64,7 @@ export function useRunScenery(runActive: boolean) {
         if (videoRef.current !== video || session.format !== 'hls') return false;
         session.format = 'mp4';
         session.hasAdvanced = false;
+        video.autoplay = false;
         video.src = runSceneryUrl('mp4', retryId);
         watch.current = startSceneryWatch(performance.now(), position());
         setStatus('loading');
@@ -80,6 +82,8 @@ export function useRunScenery(runActive: boolean) {
       },
     };
     sessionRef.current = session;
+    watch.current = startSceneryWatch(performance.now(), position());
+    video.autoplay = session.format === 'hls';
     video.src = runSceneryUrl(session.format, retryId);
     setStatus('loading');
   }, [playVideo]);
@@ -108,7 +112,8 @@ export function useRunScenery(runActive: boolean) {
       const session = sessionRef.current;
       if (document.hidden || !video || !session || !watch.current) return;
       const observation = observeScenery(watch.current, {
-        now: performance.now(), position: session.position(), playing: !video.paused && !video.seeking && !video.error,
+        now: performance.now(), position: session.position(),
+        playing: !video.paused && !video.seeking && !video.error && video.readyState >= video.HAVE_CURRENT_DATA,
         // The original 1080p stream starts with a 10-second segment. Don't
         // suggest interrupting that initial download after only eight seconds.
         timeoutMs: session.format === 'hls' && !session.hasAdvanced ? 25_000 : undefined,
@@ -123,7 +128,11 @@ export function useRunScenery(runActive: boolean) {
     return () => {
       wantsPlayback.current = false;
       playRequest.current++;
-      videoRef.current?.pause();
+      const video = videoRef.current;
+      if (video) {
+        video.autoplay = false;
+        video.pause();
+      }
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', reset);
     };
