@@ -30,7 +30,6 @@ import OnlineSupportView from '../OnlineSupportView';
 import MyDevicesView from '../MyDevicesView';
 import DeviceConnectedPrompt from '../DeviceConnectedPrompt';
 import { resolveCityCover, resolveLocalImage, resolveRecommendationCover } from '../../lib/localImages';
-import { createRunSceneryVideo } from '../../lib/runScenery';
 import RouteDetailView from '../RouteDetailView';
 import RunPlaybackView from '../RunPlaybackView';
 import TeamRelayView from '../TeamRelayView';
@@ -1655,11 +1654,7 @@ function UtilityPanel({ mode, deviceConnected, manualReducedMotion, onToggleDevi
 }
 
 export default function JourneyApp() {
-  const runSceneryRef = useRef<HTMLVideoElement | null>(null);
   const runMusicRef = useRef<HTMLAudioElement>(null);
-  const prepareRunScenery = useCallback(() => {
-    return runSceneryRef.current ??= createRunSceneryVideo();
-  }, []);
   const startRunMedia = (track = defaultRunExperience.track) => {
     const audio = runMusicRef.current;
     if (audio) {
@@ -1670,11 +1665,6 @@ export default function JourneyApp() {
         // The playback screen can retry music if autoplay is blocked.
       });
     }
-    const video = prepareRunScenery();
-    video.preload = 'auto';
-    void video.play().catch(() => {
-      // The run screen offers an in-page playback retry.
-    });
   };
   const {enabled:puzzleDemo,openOnLoad:puzzleDeepLink}=getPuzzlePreviewMode(window.location.search);
   const coinRewards = useCoinRewards(new URLSearchParams(window.location.search).get('coinDemo') === '1');
@@ -2213,14 +2203,12 @@ export default function JourneyApp() {
         {isFirstUse ? <motion.div className="screen-layer" key="first-city" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -12 }}><FirstJourneyExperience selectedId={firstCityChoiceId} currentCity={currentCity} currentCityCompletedRoutes={currentCityCompletedRoutes} hasExistingJourney={hasExistingJourney} onSelect={setFirstCityChoiceId} onContinue={startFirstJourney} onResume={resumeCurrentJourney} /></motion.div>
         : runningActivityRoute ? <motion.div className="screen-layer" key="running-activity" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <RunPlaybackView
-            prepareScenery={prepareRunScenery}
             musicRef={runMusicRef}
             musicTrack={defaultRunExperience.track}
             cityId={runningActivityRoute.cityId}
             cityName={runningActivityRoute.source === 'teamRelay' ? getJourneyCity(runningActivityRoute.cityId)?.name ?? runningActivityRoute.scene?.title : undefined}
             categoryLabel={runningActivityRoute.source === 'teamRelay' && runningActivityRoute.scene ? runningActivityRoute.puzzleRoute.name : undefined}
             routeIndex={runningActivityRoute.routeIndex}
-            image={runningActivityRoute.image}
             routeOverride={teamRouteItem(runningActivityRoute)}
             requireFullRoute={runningActivityRoute.source === 'teamRelay'}
             coinRewards={runCoinRewards(activityJourneyRoute(runningActivityRoute))}
@@ -2286,7 +2274,6 @@ export default function JourneyApp() {
         : runningRoute && runningRouteData ? (
           <motion.div className="screen-layer" key="running" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <RunPlaybackView
-              prepareScenery={prepareRunScenery}
               musicRef={runMusicRef}
               musicTrack={runningRoute.musicTrack}
               trackTeamMileage={!!runningRoute.teamRun}
@@ -2295,7 +2282,6 @@ export default function JourneyApp() {
               useActualStats={!!runningRoute.scene?.preview}
               cityId={runningRouteData.cityId} cityName={runningCity?.name ?? runningRoute.scene?.title}
               routeIndex={runningRouteData.order}
-              image={runningRoute.scene ? runSceneImage(runningRoute.scene) : runningCity ? cityImageFor(runningCity) : ''}
               routeOverride={runningRoute.scene
                 ? toSceneRouteItem(runningRouteData, runningRoute.scene, state)
                 : toLegacyRouteItem(runningRouteData, state, recommendationsOpen)}

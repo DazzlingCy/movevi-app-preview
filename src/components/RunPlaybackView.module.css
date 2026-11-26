@@ -77,7 +77,7 @@
 }
 .routeTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-.sceneryVideo, .sceneryPoster {
+.sceneryVideo {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -217,6 +217,7 @@
 
 .sceneryNotice {
   position: absolute;
+  z-index: 6;
   top: 50%;
   left: 50%;
   display: flex;
@@ -232,6 +233,16 @@
   color: #fff;
   font-size: 13px;
 }
+
+.sceneryRetry {
+  border-color: var(--run-accent);
+  color: var(--run-accent);
+  cursor: pointer;
+  font-weight: 650;
+  pointer-events: auto;
+}
+
+.sceneryRetry:focus-visible { outline: 2px solid var(--run-accent); outline-offset: 3px; }
 
 .playbackControls {
   --control-gap: 7px;
@@ -254,18 +265,6 @@
   overflow-y: auto;
   scrollbar-width: none;
   pointer-events: auto;
-}
-
-.playbackControls .reloadScenery {
-  align-content: center;
-  gap: 2px;
-  font-size: 9px;
-  line-height: 1.1;
-}
-
-.playbackControls .reloadScenery[data-retry] {
-  border-color: var(--run-accent);
-  color: var(--run-accent);
 }
 
 .backButton, .playbackControls button {
