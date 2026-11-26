@@ -1,8 +1,8 @@
 import { chooseRunSceneryFormat, type RunSceneryFormat } from '../journey/sceneryFormat';
 
-const runSceneryMp4 = `${import.meta.env.BASE_URL}video/routes/open-trail-demo.mp4`;
-const runSceneryHls = `${import.meta.env.BASE_URL}video/routes/open-trail-ios/master.m3u8`;
-export const runSceneryPoster = `${import.meta.env.BASE_URL}video/routes/open-trail-demo.webp`;
+const runSceneryMp4 = `${import.meta.env.BASE_URL}video/routes/panul-trail-demo.mp4`;
+const runSceneryHls = `${import.meta.env.BASE_URL}video/routes/panul-trail-ios/master.m3u8`;
+export const runSceneryPoster = `${import.meta.env.BASE_URL}video/routes/panul-trail-demo.webp`;
 
 export function preferredRunSceneryFormat(video: HTMLVideoElement): RunSceneryFormat {
   return chooseRunSceneryFormat({

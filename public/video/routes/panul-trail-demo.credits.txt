@@ -1,0 +1,8 @@
+Walking through Blanca Nieves trail - Panul native forest, by Marcelo.Cueto.
+Source: https://commons.wikimedia.org/wiki/File:Caminata_Sendero_Blanca_Nieves_-_Bosque_Panul_-_02_octubre_2022.webm
+License: Creative Commons Attribution-ShareAlike 4.0 International.
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Changes: selected a short excerpt, removed source audio, and encoded a 1080p
+H.264 MP4. The WebP cover is a frame from the excerpt. The excerpt, its HLS
+segments, and the cover are distributed under CC BY-SA 4.0.

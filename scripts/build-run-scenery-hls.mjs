@@ -2,8 +2,8 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const input = resolve('dist/video/routes/open-trail-demo.mp4');
-const directory = resolve('dist/video/routes/open-trail-ios');
+const input = resolve('dist/video/routes/panul-trail-demo.mp4');
+const directory = resolve('dist/video/routes/panul-trail-ios');
 mkdirSync(directory, { recursive: true });
 
 // Keep the original H.264 bitstream and wrap it in MPEG-TS segments so
@@ -11,7 +11,7 @@ mkdirSync(directory, { recursive: true });
 const result = spawnSync('ffmpeg', [
   '-hide_banner', '-loglevel', 'error', '-y', '-i', input,
   '-map', '0:v:0', '-c:v', 'copy', '-an',
-  '-f', 'hls', '-hls_playlist_type', 'vod', '-hls_time', '6',
+  '-f', 'hls', '-hls_playlist_type', 'vod', '-hls_time', '2',
   '-hls_segment_type', 'mpegts', '-hls_flags', 'independent_segments',
   '-master_pl_name', 'master.m3u8',
   '-hls_segment_filename', 'segment-%02d.ts', 'index.m3u8',

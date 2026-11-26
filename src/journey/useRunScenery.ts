@@ -114,8 +114,7 @@ export function useRunScenery(runActive: boolean) {
       const observation = observeScenery(watch.current, {
         now: performance.now(), position: session.position(),
         playing: !video.paused && !video.seeking && !video.error && video.readyState >= video.HAVE_CURRENT_DATA,
-        // The original 1080p stream starts with a 10-second segment. Don't
-        // suggest interrupting that initial download after only eight seconds.
+        // Allow extra initial buffering for the native 1080p stream.
         timeoutMs: session.format === 'hls' && !session.hasAdvanced ? 25_000 : undefined,
       });
       watch.current = observation.watch;
