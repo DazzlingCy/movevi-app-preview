@@ -1,0 +1,13 @@
+本地测试使用完整录音。
+
+倔强 — 五月天
+音频来源：https://github.com/houwanle/music
+歌词时间轴：https://lrclib.net/api/get/16279989
+
+奔跑 — 黄征、羽·泉
+音频和歌词时间轴来源：https://github.com/dhjygit/cdn.music
+版本：爱情诺曼底
+
+逆战 — 张杰
+音频来源：https://704919-zhang-jie.mp3.pm/song/128682662-against-the-war/
+歌词时间轴：https://lrclib.net/api/get/19122905

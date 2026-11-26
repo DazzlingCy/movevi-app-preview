@@ -26,10 +26,10 @@ export default function RunSceneContentView({ scene, homeControls, routeIndex, o
           <img className={styles.image} src={runSceneImage(entry)} alt="" width="550" height="960" decoding="async"
             loading={active ? 'eager' : 'lazy'} fetchPriority={active ? 'high' : 'low'} />
         </span>
-        <span className={styles.routeType + ' ' + styles.sceneType}>{scene.cardLabel ?? scene.label}</span>
+        <span className={styles.routeType + ' ' + styles.sceneType}>{scene.label}</span>
         <span className={styles.routeBody}>
           <strong>{entry.title}</strong>
-          <span className={styles.landmarks}>{route.name.replace(/\s*·\s*/, ' · ')}</span>
+          <span className={styles.landmarks}>{route.name.replace(/\s*·\s*/g, ' ')}</span>
         </span>
         <span className={styles.metrics}>{route.distanceKm.toFixed(1)} km · 约 {route.durationMinutes} 分钟</span>
         <button className={styles.action} type="button" onClick={() => onRouteClick(entry, route, index)} aria-label={`查看${entry.title}路线`}>查看路线</button>

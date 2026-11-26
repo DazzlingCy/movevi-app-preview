@@ -3,8 +3,10 @@ import { useId, useRef, useState } from 'react';
 import { Play, ChevronLeft, MessageCircle, MapPin, AlignLeft, X, Lock, UserRound } from 'lucide-react';
 import { getRouteData } from '../data/cities';
 import { resolveRecommendationCover } from '../lib/localImages';
+import type { RunSpeed } from '../journey/runSpeed';
 import CityImage from './CityImage';
 import RouteRunners from './RouteRunners';
+import RunSpeedPicker from './RunSpeedPicker';
 import Modal from './journey/Modal';
 import type { CityRouteListItem } from './CityRoutesView';
 import styles from './RouteDetailView.module.css';
@@ -20,7 +22,9 @@ interface RouteDetailViewProps {
   currentJourney?: { name: string; image: string; completed: number; total: number };
   onContinueJourney?: () => void;
   onBack: () => void;
-  onStart: () => void;
+  chooseSpeed?: boolean;
+  smartSpeedDescription?: string;
+  onStart: (speed?: RunSpeed) => void;
 }
 
 interface RouteComment {
@@ -40,7 +44,7 @@ function renderCommentEntry(comment: RouteComment, index: number) {
   );
 }
 
-export default function RouteDetailView({ cityId, routeIndex, image, routeOverride, exampleRoute = false, collectionIntent, unselectedCityName, currentJourney, onContinueJourney, onBack, onStart }: RouteDetailViewProps) {
+export default function RouteDetailView({ cityId, routeIndex, image, routeOverride, exampleRoute = false, collectionIntent, unselectedCityName, currentJourney, onContinueJourney, onBack, chooseSpeed = false, smartSpeedDescription, onStart }: RouteDetailViewProps) {
   const routeData = routeOverride ?? getRouteData(cityId, routeIndex);
   const isLocked = routeOverride?.isUnlocked === false && !routeOverride?.isCompleted;
   const gradientId = useId();
@@ -49,13 +53,15 @@ export default function RouteDetailView({ cityId, routeIndex, image, routeOverri
   const cityUnlockTitleId = useId();
   const [showComments, setShowComments] = useState(false);
   const [showCityUnlock, setShowCityUnlock] = useState(false);
-  const cityActionRef = useRef<HTMLButtonElement>(null);
+  const [showSpeedPicker, setShowSpeedPicker] = useState(false);
+  const startActionRef = useRef<HTMLButtonElement>(null);
   const cityUnlockOpen = showCityUnlock && !!unselectedCityName;
+  const dialogOpen = showComments || cityUnlockOpen || showSpeedPicker;
   const journeyComplete = !!currentJourney && currentJourney.total > 0 && currentJourney.completed >= currentJourney.total;
   const journeyRemaining = currentJourney ? Math.max(0, currentJourney.total - currentJourney.completed) : 0;
   const closeCityUnlock = () => {
     setShowCityUnlock(false);
-    window.requestAnimationFrame(() => cityActionRef.current?.focus({ preventScroll:true }));
+    window.requestAnimationFrame(() => startActionRef.current?.focus({ preventScroll:true }));
   };
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [comments, setComments] = useState<Record<string, RouteComment[]>>({});
@@ -72,7 +78,7 @@ export default function RouteDetailView({ cityId, routeIndex, image, routeOverri
 
   return (
     <div className={styles.page}>
-      <main className={styles.scrollArea} inert={showComments || cityUnlockOpen || undefined}>
+      <main className={styles.scrollArea} inert={dialogOpen || undefined}>
         <StickyHeroNav transparent>
           <button type="button" onClick={onBack} className={styles.back} aria-label="返回">
             <ChevronLeft size={22} />
@@ -134,15 +140,30 @@ export default function RouteDetailView({ cityId, routeIndex, image, routeOverri
         </div>
       </main>
 
-      <footer className={styles.actions} inert={showComments || cityUnlockOpen || undefined}>
+      <footer className={styles.actions} inert={dialogOpen || undefined}>
         <button type="button" className={styles.commentButton} onClick={() => setShowComments(true)} aria-haspopup="dialog">
           <MessageCircle size={21} aria-hidden="true" /><span>评论</span>
         </button>
-        <button ref={cityActionRef} type="button" disabled={isLocked && !unselectedCityName} data-unselected-city={!!unselectedCityName} aria-haspopup={unselectedCityName ? 'dialog' : undefined} onClick={() => { if (unselectedCityName) { setShowCityUnlock(true); return; } if (!isLocked) onStart(); }} className={styles.startButton} title={!unselectedCityName && isLocked ? '完成前序路线后解锁' : undefined}>
+        <button ref={startActionRef} type="button" disabled={isLocked && !unselectedCityName} data-unselected-city={!!unselectedCityName}
+          aria-haspopup={unselectedCityName || chooseSpeed ? 'dialog' : undefined}
+          onClick={() => {
+            if (unselectedCityName) setShowCityUnlock(true);
+            else if (!isLocked && chooseSpeed) setShowSpeedPicker(true);
+            else if (!isLocked) onStart();
+          }}
+          className={styles.startButton} title={!unselectedCityName && isLocked ? '完成前序路线后解锁' : undefined}>
           {unselectedCityName || isLocked ? <Lock size={18} aria-hidden="true" /> : <Play size={18} fill="currentColor" aria-hidden="true" />}
           {unselectedCityName ? '未选择城市' : isLocked ? '未解锁 · 暂不能开始' : collectionIntent === 'collect' ? '开始收集' : collectionIntent === 'review' ? '再跑一次' : '开始跑步'}
         </button>
       </footer>
+
+      {showSpeedPicker && <RunSpeedPicker smartSpeedDescription={smartSpeedDescription} onClose={() => {
+        setShowSpeedPicker(false);
+        window.requestAnimationFrame(() => startActionRef.current?.focus({ preventScroll: true }));
+      }} onConfirm={speed => {
+        setShowSpeedPicker(false);
+        onStart(speed);
+      }} />}
 
       {cityUnlockOpen && <div className={styles.modalLayer}>
         <Modal labelId={cityUnlockTitleId} onClose={closeCityUnlock} className={styles.cityUnlockSheet} backdropClassName={styles.cityUnlockBackdrop}>

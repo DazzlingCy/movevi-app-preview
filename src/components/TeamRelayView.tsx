@@ -6,6 +6,7 @@ import { getTeamCoinReward, TEAM_DUO_COINS, TEAM_SHARED_ROUTE_COINS } from '../j
 import CityImage from './CityImage';
 import Modal from './journey/Modal';
 import { resolveLocalImage } from '../lib/localImages';
+import { runScenerySource } from '../lib/runScenery';
 import { previewPuzzleHistory } from '../journey/puzzleHistory';
 import { PUZZLE_LOBBY_LIMIT } from '../journey/puzzleDemo';
 import { puzzleProgressFeedback } from '../journey/puzzleFeedback';
@@ -32,7 +33,7 @@ interface Props {
   onGoCoins: () => void;
 }
 const time = (n: number) => new Date(n).toLocaleString('zh-CN', { timeZone:'Asia/Shanghai', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false });
-const trialVideo = `${import.meta.env.BASE_URL}video/routes/team-relay-trial.mp4`;
+const trialDurationSeconds = 12;
 
 export function RelayTrialRun({ route, onBack, onFinish }:{route:PuzzleRoute;onBack:()=>void;onFinish:()=>void}) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -64,9 +65,13 @@ export function RelayTrialRun({ route, onBack, onFinish }:{route:PuzzleRoute;onB
       <section className={styles.task} aria-label="当前路线">
         <header className={`${styles.taskHero} ${styles.trialHero}`}>
           <CityImage src={route.image} className={styles.taskPhoto} alt="" loading="eager"/>
-          <video ref={videoRef} className={styles.trialVideo} data-loaded={duration>0&&!failed} src={trialVideo} autoPlay muted playsInline
-            aria-label="体验跑视频" onLoadedMetadata={event=>setDuration(event.currentTarget.duration)}
-            onTimeUpdate={event=>setSeconds(Math.floor(event.currentTarget.currentTime))}
+          <video ref={videoRef} className={styles.trialVideo} data-loaded={duration>0&&!failed} src={runScenerySource} autoPlay muted playsInline
+            aria-label="体验跑视频" onLoadedMetadata={event=>setDuration(Math.min(trialDurationSeconds,event.currentTarget.duration))}
+            onTimeUpdate={event=>{
+              const video=event.currentTarget;
+              setSeconds(Math.min(trialDurationSeconds,Math.floor(video.currentTime)));
+              if(video.currentTime>=trialDurationSeconds){video.pause();setComplete(true);}
+            }}
             onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)}
             onEnded={()=>{setPlaying(false);setComplete(true);}}
             onError={()=>{setPlaying(false);setFailed(true);}}/>

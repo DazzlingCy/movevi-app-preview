@@ -1,11 +1,11 @@
+declare const __APP_VERSION__: string;
+
 const repositorySceneryBase = `${import.meta.env.BASE_URL}video/routes/`;
-const previewScenerySource = 'https://cdn.jsdelivr.net/gh/DazzlingCy/movevi-app-preview@6db52917e2d9ff27b24f6352e88a9cb7705cd460/public/video/routes/hangzhou-city-fast.mp4';
-const fastScenerySource = import.meta.env.PROD
-  ? previewScenerySource
-  : `${repositorySceneryBase}hangzhou-city-fast.mp4`;
-const fallbackScenerySource = import.meta.env.PROD
-  ? previewScenerySource
-  : `${repositorySceneryBase}hangzhou-city-demo.mp4`;
+const hostedSceneryBase = `https://cdn.jsdelivr.net/gh/DazzlingCy/movevi-app-preview@${__APP_VERSION__}/public/video/routes/`;
+const useHostedMedia = import.meta.env.PROD && !__APP_VERSION__.startsWith('local-');
+
+export const runScenerySource = `${useHostedMedia ? hostedSceneryBase : repositorySceneryBase}open-trail-demo.mp4`;
+export const runSceneryPoster = `${useHostedMedia ? hostedSceneryBase : repositorySceneryBase}open-trail-demo.webp`;
 
 export function createRunSceneryVideo(): HTMLVideoElement {
   const video = document.createElement('video');
@@ -14,14 +14,12 @@ export function createRunSceneryVideo(): HTMLVideoElement {
   video.muted = true;
   video.playsInline = true;
   video.loop = true;
-  video.src = fastScenerySource;
+  video.src = runScenerySource;
   return video;
 }
 
 export function reloadRunSceneryVideo(video: HTMLVideoElement): void {
   const position = video.currentTime;
-  // Some browsers load the conventional MP4 more reliably than a fragmented MP4.
-  if (video.getAttribute('src') === fastScenerySource) video.src = fallbackScenerySource;
-  else video.load();
+  video.load();
   if (position > 0) video.currentTime = position;
 }

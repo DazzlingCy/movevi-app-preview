@@ -51,6 +51,8 @@ import { getDailyRouteRecommendations, type DailyRouteRecommendation } from '../
 import DailyRouteRecommendationsView from '../DailyRouteRecommendationsView';
 import RunSceneView from '../RunSceneView';
 import { getSceneContentRoute, runSceneImage, type RunSceneMode, type SceneContent } from '../../journey/runScenes';
+import type { RunSpeed } from '../../journey/runSpeed';
+import { defaultRunExperience, getRunModeExperience, type RunMusicTrack } from '../../journey/runModeExperience';
 import { chooseRunScenePreview, type RunSceneChoice } from '../../journey/runSceneTags';
 import RunSceneContentView from '../RunSceneContentView';
 import homeRunStyles from './HomeRunElements.module.css';
@@ -1654,10 +1656,20 @@ function UtilityPanel({ mode, deviceConnected, manualReducedMotion, onToggleDevi
 
 export default function JourneyApp() {
   const runSceneryRef = useRef<HTMLVideoElement | null>(null);
+  const runMusicRef = useRef<HTMLAudioElement>(null);
   const prepareRunScenery = useCallback(() => {
     return runSceneryRef.current ??= createRunSceneryVideo();
   }, []);
-  const startRunScenery = () => {
+  const startRunMedia = (track = defaultRunExperience.track) => {
+    const audio = runMusicRef.current;
+    if (audio) {
+      const source = `${import.meta.env.BASE_URL}audio/${track.file}`;
+      if (audio.getAttribute('src') === source) audio.currentTime = 0;
+      else audio.src = source;
+      void audio.play().catch(() => {
+        // The playback screen can retry music if autoplay is blocked.
+      });
+    }
     const video = prepareRunScenery();
     video.preload = 'auto';
     void video.play().catch(() => {
@@ -1712,7 +1724,7 @@ export default function JourneyApp() {
   const recommendations = getDailyRouteRecommendations(recommendationDay);
   const [newCityIds, setNewCityIds] = useState(() => PUBLISHED_CITY_IDS.slice(-1));
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
-  const [runningRoute, setRunningRoute] = useState<{ route: JourneyRoute; countsForJourney: boolean; scene?: SceneContent; teamRun?: MileageRunSession } | null>(null);
+  const [runningRoute, setRunningRoute] = useState<{ route: JourneyRoute; countsForJourney: boolean; scene?: SceneContent; categoryLabel?: string; musicTrack: RunMusicTrack; speed?: RunSpeed; teamRun?: MileageRunSession } | null>(null);
   const [utilityMode, setUtilityMode] = useState<'device' | 'profile' | null>(null);
   const [deviceConnected, setDeviceConnected] = useState(false);
   const [startupConnectionSucceeded, setStartupConnectionSucceeded] = useState(false);
@@ -1878,7 +1890,9 @@ export default function JourneyApp() {
     if (status === 'discoverable') { dispatch({ type: 'REVEAL_ROUTE', cityId: route.cityId, routeId: route.id }); setNotice(`${route.name}，已揭晓`); return; }
     if (status === 'revealed' || status === 'completed') setSelectedRouteId(route.id);
   };
-  const startRun = (route: JourneyRoute, fromRecommendation = false, scene?: SceneContent, modeId = scene ? selectedScene?.id : undefined) => {
+  const startRun = (route: JourneyRoute, {
+    fromRecommendation = false, scene, modeId = scene ? selectedScene?.id : undefined, speed,
+  }: { fromRecommendation?: boolean; scene?: SceneContent; modeId?: string; speed?: RunSpeed } = {}) => {
     const cityStatus = getCityStatus(state, route.cityId);
     const routeStatus = getRouteStatus(state, route.cityId, route.id);
     const countsForJourney = (cityStatus === 'current' || cityStatus === 'completed')
@@ -1887,9 +1901,12 @@ export default function JourneyApp() {
     if (countsForJourney && routeStatus === 'discoverable') dispatch({ type: 'REVEAL_ROUTE', cityId: route.cityId, routeId: route.id });
     exerciseSessionId.current = `run-${crypto.getRandomValues(new Uint32Array(4)).join('-')}`;
     const teamRun=puzzleDemo?mileageTeam.startRun({cityId:route.cityId,routeId:route.id,modeId}):undefined;
-    if (!scene?.preview || teamRun) startRunScenery();
+    const { track, smartSpeed } = getRunModeExperience(modeId);
+    const runningSpeed: RunSpeed | undefined = speed?.mode === 'smart' && smartSpeed ? { ...speed, profile: smartSpeed.profile } : speed;
+    startRunMedia(track);
     if (!deviceConnected) connectPreviewDevice();
-    setRunningRoute({ route, countsForJourney, scene, teamRun });
+    const categoryLabel = modeId ? (selectedScene?.id === modeId ? selectedScene.label : findMileageMode(modeId)?.label) : undefined;
+    setRunningRoute({ route, countsForJourney, scene, categoryLabel, musicTrack: track, speed: runningSpeed, teamRun });
     setSceneRoute(null);
     setRouteCityId(null);
   };
@@ -1897,7 +1914,7 @@ export default function JourneyApp() {
     if (!routeCityId || !selectedRouteId) return;
     const route = getJourneyRoute(routeCityId, selectedRouteId);
     if (!route) return;
-    startRun(route, recommendationsOpen);
+    startRun(route, { fromRecommendation: recommendationsOpen });
   };
   const coinWorkoutFor = (route: JourneyRoute | undefined, evidence: CoinExerciseEvidence, mileageOnly = false) => {
     if (!route || !exerciseSessionId.current) return;
@@ -2080,7 +2097,7 @@ export default function JourneyApp() {
       completeActivityRoute(target,{distance:available.distanceKm,duration:available.minutes*60,calories:source?.calories??0});
       return;
     }
-    if (!target.scene?.preview) startRunScenery();
+    startRunMedia();
     setRunningActivityRoute(target);
   };
   const activityJourneyRoute = (target: ActivityRouteTarget) =>
@@ -2189,14 +2206,19 @@ export default function JourneyApp() {
     && !legacyFeature && !cityListOpen && !utilityMode;
 
   return (
-    <div className="app-stage"><a className="skip-link" href={scenePickerOpen ? '#run-scene-content' : '#main-content'}>跳到主要内容</a><div className="phone-shell" data-reduced-motion={reduceMotion}><div className="paper-grain" aria-hidden="true" />
+    <div className="app-stage">
+      <audio ref={runMusicRef} preload="none" loop hidden />
+      <a className="skip-link" href={scenePickerOpen ? '#run-scene-content' : '#main-content'}>跳到主要内容</a><div className="phone-shell" data-reduced-motion={reduceMotion}><div className="paper-grain" aria-hidden="true" />
       <AnimatePresence mode="wait" initial={false}>
         {isFirstUse ? <motion.div className="screen-layer" key="first-city" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -12 }}><FirstJourneyExperience selectedId={firstCityChoiceId} currentCity={currentCity} currentCityCompletedRoutes={currentCityCompletedRoutes} hasExistingJourney={hasExistingJourney} onSelect={setFirstCityChoiceId} onContinue={startFirstJourney} onResume={resumeCurrentJourney} /></motion.div>
         : runningActivityRoute ? <motion.div className="screen-layer" key="running-activity" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <RunPlaybackView
-            prepareScenery={runningActivityRoute.source === 'teamRelay' && runningActivityRoute.scene?.preview ? undefined : prepareRunScenery}
+            prepareScenery={prepareRunScenery}
+            musicRef={runMusicRef}
+            musicTrack={defaultRunExperience.track}
             cityId={runningActivityRoute.cityId}
             cityName={runningActivityRoute.source === 'teamRelay' ? getJourneyCity(runningActivityRoute.cityId)?.name ?? runningActivityRoute.scene?.title : undefined}
+            categoryLabel={runningActivityRoute.source === 'teamRelay' && runningActivityRoute.scene ? runningActivityRoute.puzzleRoute.name : undefined}
             routeIndex={runningActivityRoute.routeIndex}
             image={runningActivityRoute.image}
             routeOverride={teamRouteItem(runningActivityRoute)}
@@ -2210,7 +2232,7 @@ export default function JourneyApp() {
           <RouteDetailView cityId={activityRoute.cityId} routeIndex={activityRoute.routeIndex} image={activityRoute.image}
             routeOverride={teamRouteItem(activityRoute)} onBack={() => setActivityRoute(null)} onStart={() => {
               if (activityRoute.source === 'teamRelay') { startTeamRelayRun(activityRoute); return; }
-              exerciseSessionId.current = crypto.randomUUID(); startRunScenery(); setRunningActivityRoute(activityRoute); setActivityRoute(null);
+              exerciseSessionId.current = crypto.randomUUID(); startRunMedia(); setRunningActivityRoute(activityRoute); setActivityRoute(null);
             }}
           />
         </motion.div>
@@ -2245,7 +2267,7 @@ export default function JourneyApp() {
           <RouteDetailView cityId={mileageRoute.route.cityId} routeIndex={mileageRoute.route.order} image={mileageRoute.image}
             routeOverride={mileageRoute.entry ? toSceneRouteItem(mileageRoute.route, mileageRoute.entry, state) : toLegacyRouteItem(mileageRoute.route, state)}
             exampleRoute={!!mileageRoute.entry?.preview} onBack={() => setMileageRoute(null)}
-            onStart={() => startRun(mileageRoute.route, false, mileageRoute.entry, mileageRoute.modeId)} />
+            onStart={() => startRun(mileageRoute.route, { scene: mileageRoute.entry, modeId: mileageRoute.modeId })} />
         </motion.div>
         : legacyFeature === 'teamRelay' && !runningRoute ? <motion.div className="screen-layer" key="team-relay" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
           {puzzleDemo ? <MileageTeamView choices={mileageChoices} snapshot={mileageTeam.snapshot} error={mileageTeam.error} reduceMotion={reduceMotion}
@@ -2264,8 +2286,12 @@ export default function JourneyApp() {
         : runningRoute && runningRouteData ? (
           <motion.div className="screen-layer" key="running" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <RunPlaybackView
-              prepareScenery={runningRoute.scene?.preview && !runningRoute.teamRun ? undefined : prepareRunScenery}
+              prepareScenery={prepareRunScenery}
+              musicRef={runMusicRef}
+              musicTrack={runningRoute.musicTrack}
               trackTeamMileage={!!runningRoute.teamRun}
+              initialSpeed={runningRoute.speed}
+              categoryLabel={runningRoute.categoryLabel}
               useActualStats={!!runningRoute.scene?.preview}
               cityId={runningRouteData.cityId} cityName={runningCity?.name ?? runningRoute.scene?.title}
               routeIndex={runningRouteData.order}
@@ -2291,8 +2317,9 @@ export default function JourneyApp() {
           <motion.div className="screen-layer" key="scene-route-preview" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
             <RouteDetailView cityId={sceneRoute.route.cityId} routeIndex={sceneRoute.route.order}
               image={runSceneImage(sceneRoute.entry)} routeOverride={toSceneRouteItem(sceneRoute.route, sceneRoute.entry, state)}
-              exampleRoute={!!sceneRoute.entry.preview} onBack={() => setSceneRoute(null)}
-              onStart={() => startRun(sceneRoute.route, false, sceneRoute.entry)} />
+              exampleRoute={!!sceneRoute.entry.preview} onBack={() => setSceneRoute(null)} chooseSpeed
+              smartSpeedDescription={getRunModeExperience(selectedScene?.id).smartSpeed?.description}
+              onStart={speed => startRun(sceneRoute.route, { scene: sceneRoute.entry, speed })} />
           </motion.div>
         )
         : routeSheetCity && selectedRouteData ? <motion.div className="screen-layer" key="legacy-route-detail" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}><RouteDetailView cityId={routeSheetCity.id} routeIndex={selectedRouteData.order} image={cityImageFor(routeSheetCity)} routeOverride={toLegacyRouteItem(selectedRouteData, state, recommendationsOpen)} currentJourney={{ name:currentCity.name, image:cityImageFor(currentCity), completed:currentCityCompletedRoutes, total:currentCity.routes.length }} onContinueJourney={continueCurrentJourney} unselectedCityName={!recommendationsOpen && !['current', 'completed'].includes(getCityStatus(state, routeSheetCity.id)) ? routeSheetCity.name : undefined} onBack={closeRouteDetail} onStart={startSelectedRoute} /></motion.div>

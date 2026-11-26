@@ -18,7 +18,6 @@ type RunSceneId = 'beach' | 'forest' | 'architecture' | 'midday';
 export interface RunSceneMode {
   id: RunSceneId | `tag:${string}`;
   label: string;
-  cardLabel?: string;
   backdropHue: number;
   entries: readonly [SceneContent, ...SceneContent[]];
 }

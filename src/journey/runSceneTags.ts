@@ -193,7 +193,7 @@ export function chooseRunScenePreview(choice: PreviewChoice, previousLeadImage?:
     entries.push(...remaining.splice(index, 1));
   }
 
-  return { ...choice, backdropHue: first.backdropHue, cardLabel: '路线预览', entries };
+  return { ...choice, backdropHue: first.backdropHue, entries };
 }
 
 function getTagMode(key: RunSceneTagKey, label: string, durationMinutes?: number): RunSceneChoice {
@@ -222,4 +222,13 @@ export const RUN_SCENE_TAG_GROUPS = TAG_GROUPS.map(group => ({
     const label = SHORT_LABELS[key] ?? sourceLabel;
     return { key, label, mode: getTagMode(key, label, duration ? Number(duration[1]) : undefined) };
   }),
+}));
+
+export const RUN_SCENE_SIDEBAR_TAGS = ([
+  { key: 'purpose:改善久坐状态', label: '改善久坐' },
+  { key: 'lifestyle:周末居家', label: '周末居家' },
+  { key: 'training:坡度训练', label: '坡度训练' },
+] satisfies { key: RunSceneTagKey; label: string }[]).map(tag => ({
+  ...tag,
+  mode: getTagMode(tag.key, tag.label),
 }));
